@@ -374,7 +374,7 @@ export default function CatalogView({
           <div className="brand">
             <div className="brand-mark">P</div>
             <div>
-              <h1>Pricebook</h1>
+              <h1>Growsary</h1>
               <span>quick lookup for the shop floor</span>
             </div>
           </div>
