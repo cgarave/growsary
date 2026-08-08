@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Store Price Board — Mockup</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap');
+
+  :root{
+    --ink:#1C1B19; --paper:#FAFAF8; --card:#FFFFFF; --line:#E7E4DD;
+    --teal:#215A4C; --teal-soft:#E4EEEA; --amber:#C87A1A; --amber-soft:#FBEDD9;
+    --red:#B3453A; --red-soft:#F7E7E5; --muted:#8A8578;
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--paper); color:var(--ink); font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased; padding-bottom:90px; }
+  .mono{ font-family:'IBM Plex Mono',monospace; font-variant-numeric: tabular-nums; }
+
+  header{ position:sticky; top:0; z-index:20; background:var(--paper); border-bottom:1px solid var(--line); padding:18px 28px 14px; }
+  .top-row{ display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; }
+  .brand{ display:flex; align-items:baseline; gap:10px; }
+  .brand-mark{ width:30px; height:30px; border-radius:8px; background:var(--teal); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px; flex-shrink:0; }
+  .brand h1{ font-size:17px; font-weight:700; margin:0; letter-spacing:-0.01em; }
+  .brand span{ font-size:12px; color:var(--muted); }
+
+  .search{ flex:1; min-width:160px; max-width:340px; display:flex; align-items:center; gap:8px; background:var(--card); border:1px solid var(--line); border-radius:10px; padding:9px 12px; }
+  .search svg{ flex-shrink:0; opacity:0.45; }
+  .search input{ border:none; outline:none; background:transparent; width:100%; font-family:'Inter'; font-size:14px; color:var(--ink); }
+  .search input::placeholder{ color:var(--muted); }
+
+  .icon-btn{ display:flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:9px; border:1px solid var(--line); background:var(--card); cursor:pointer; flex-shrink:0; color:var(--ink); position:relative; }
+  .icon-btn:hover{ background:var(--teal-soft); border-color:var(--teal); }
+  .cart-count{ position:absolute; top:-6px; right:-6px; background:var(--red); color:#fff; font-size:10px; font-weight:700; width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
+
+  .price-toggle{ display:flex; align-items:center; background:var(--card); border:1px solid var(--line); border-radius:999px; padding:3px; position:relative; width:190px; flex-shrink:0; }
+  .price-toggle .knob{ position:absolute; top:3px; left:3px; width:calc(50% - 3px); height:calc(100% - 6px); background:var(--teal); border-radius:999px; transition:transform .25s cubic-bezier(.4,0,.2,1); }
+  .price-toggle.wholesale .knob{ transform:translateX(100%); background:var(--amber); }
+  .price-toggle button{ flex:1; z-index:1; background:none; border:none; padding:8px 4px; font-family:'Inter'; font-size:12px; font-weight:600; letter-spacing:0.02em; color:var(--muted); cursor:pointer; transition:color .2s; }
+  .price-toggle.retail button:first-child{ color:#fff; }
+  .price-toggle.wholesale button:last-child{ color:#fff; }
+
+  .admin-zone{ display:flex; align-items:center; gap:8px; flex-shrink:0; }
+  .admin-btn{ font-size:12.5px; font-weight:700; padding:8px 14px; border-radius:999px; border:1px solid var(--ink); background:var(--ink); color:#fff; cursor:pointer; white-space:nowrap; }
+  body.is-admin .admin-btn{ background:var(--red); border-color:var(--red); }
+  .admin-badge{ display:none; align-items:center; gap:6px; font-size:12px; font-weight:600; color:var(--teal); }
+  body.is-admin .admin-badge{ display:flex; }
+  .admin-badge .dot{ width:7px; height:7px; border-radius:50%; background:var(--teal); }
+
+  .chips{ display:flex; gap:8px; margin-top:14px; overflow-x:auto; padding-bottom:2px; }
+  .chip{ font-size:13px; font-weight:600; padding:7px 14px; border-radius:999px; border:1px solid var(--line); background:var(--card); color:var(--ink); white-space:nowrap; cursor:pointer; }
+  .chip.active{ background:var(--teal); border-color:var(--teal); color:#fff; }
+
+  main{ padding:24px 28px 40px; max-width:1180px; margin:0 auto; }
+  .section-label{ display:flex; align-items:center; gap:10px; margin:30px 0 14px; }
+  .section-label h2{ font-size:15px; font-weight:700; margin:0; }
+  .section-label .count{ font-size:12px; color:var(--muted); }
+  .section-label::after{ content:''; flex:1; height:1px; background:var(--line); }
+
+  .grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:14px; }
+
+  .card{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; display:flex; flex-direction:column; gap:10px; position:relative; transition:box-shadow .15s, transform .15s; }
+  .card:hover{ box-shadow:0 4px 14px rgba(28,27,25,0.06); transform:translateY(-1px); }
+  .card.out-of-stock .thumb{ filter:grayscale(1); opacity:0.5; }
+  .card.out-of-stock .name, .card.out-of-stock .variant-row .amt{ opacity:0.45; }
+
+  .thumb{ width:100%; aspect-ratio:1/0.7; border-radius:9px; background:var(--teal-soft); display:flex; align-items:center; justify-content:center; font-size:24px; position:relative; overflow:hidden; }
+  .thumb img{ width:100%; height:100%; object-fit:cover; }
+  .change-badge{ position:absolute; top:7px; right:7px; background:var(--amber-soft); color:var(--amber); font-size:10.5px; font-weight:700; padding:3px 7px; border-radius:999px; }
+  .oos-badge{ position:absolute; top:7px; left:7px; background:var(--red); color:#fff; font-size:10px; font-weight:700; padding:3px 8px; border-radius:999px; letter-spacing:0.02em; }
+  .barcode-badge{ position:absolute; bottom:6px; right:6px; background:rgba(28,27,25,0.55); color:#fff; font-size:9px; font-weight:600; padding:2px 6px; border-radius:5px; letter-spacing:0.02em; }
+
+  .name{ font-size:13.5px; font-weight:600; line-height:1.25; }
+  .brand-line{ font-size:11.5px; color:var(--muted); margin-top:-6px; }
+
+  .variant-list{ display:flex; flex-direction:column; border-top:1px dashed var(--line); padding-top:8px; }
+  .variant-row{ display:flex; align-items:center; justify-content:space-between; padding:4px 0; font-size:12.5px; gap:8px; }
+  .variant-row .lbl{ color:var(--muted); font-weight:500; flex:1; }
+  .variant-row .amt{ font-weight:700; font-size:14.5px; }
+  .amt.wholesale-mode{ color:var(--amber); }
+  .amt.retail-mode{ color:var(--teal); }
+  .mode-tag{ font-size:9.5px; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; color:var(--muted); margin-bottom:2px; }
+
+  .card-add-btn{ width:100%; padding:9px 0; border-radius:9px; border:1px solid var(--teal); background:var(--teal-soft); color:var(--teal); font-size:12.5px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; }
+  .card-add-btn:hover{ background:var(--teal); color:#fff; }
+  .card.out-of-stock .card-add-btn{ pointer-events:none; opacity:0.4; }
+
+  /* Variant picker modal */
+  .vm-line{ display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-bottom:1px solid var(--line); gap:10px; }
+  .vm-line:last-of-type{ border-bottom:none; }
+  .vm-info .vm-label{ font-size:13px; font-weight:600; }
+  .vm-info .vm-price{ font-size:12.5px; color:var(--teal); font-weight:700; font-family:'IBM Plex Mono',monospace; margin-top:1px; }
+  .vm-price.wholesale-mode{ color:var(--amber); }
+  .vm-stepper{ display:flex; align-items:center; gap:10px; flex-shrink:0; }
+  .vm-stepper button{ width:30px; height:30px; border-radius:8px; border:1px solid var(--line); background:var(--paper); font-size:16px; font-weight:800; cursor:pointer; color:var(--ink); }
+  .vm-stepper button:disabled{ opacity:0.35; cursor:default; }
+  .vm-stepper span{ font-size:14px; font-weight:700; min-width:18px; text-align:center; }
+  .vm-header{ display:flex; align-items:center; gap:10px; margin-bottom:4px; }
+  .vm-thumb{ width:42px; height:42px; border-radius:9px; background:var(--teal-soft); display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0; }
+  .vm-summary{ display:flex; justify-content:space-between; align-items:baseline; margin:14px 0 12px; font-size:13.5px; font-weight:600; }
+  .vm-summary .amt{ font-size:17px; font-family:'IBM Plex Mono',monospace; color:var(--teal); }
+  .confirm-add-btn{ width:100%; padding:12px 0; border-radius:10px; border:none; background:var(--teal); color:#fff; font-size:14px; font-weight:700; cursor:pointer; }
+  .confirm-add-btn:disabled{ opacity:0.4; cursor:default; }
+
+  .admin-controls{ display:none; flex-direction:column; gap:6px; margin-top:2px; }
+  body.is-admin .admin-controls{ display:flex; }
+  .admin-row{ display:flex; gap:6px; }
+  .admin-row button{ flex:1; font-size:11.5px; font-weight:700; padding:7px 0; border-radius:8px; border:1px solid var(--line); background:var(--paper); color:var(--ink); cursor:pointer; }
+  .admin-row button.del{ color:var(--red); border-color:var(--red-soft); background:var(--red-soft); }
+  .admin-row button.edit:hover{ background:var(--teal-soft); border-color:var(--teal); }
+  .stock-btn{ width:100%; font-size:11.5px; font-weight:700; padding:7px 0; border-radius:8px; border:1px solid var(--line); background:var(--paper); color:var(--ink); cursor:pointer; }
+  .card.out-of-stock .stock-btn{ background:var(--teal); border-color:var(--teal); color:#fff; }
+
+  .fab-add{ display:none; position:fixed; bottom:22px; left:50%; transform:translateX(-50%); background:var(--teal); color:#fff; border:none; border-radius:999px; padding:14px 26px; font-size:14px; font-weight:700; align-items:center; gap:8px; box-shadow:0 8px 24px rgba(33,90,76,0.35); cursor:pointer; z-index:30; }
+  body.is-admin .fab-add{ display:flex; }
+
+  footer{ text-align:center; padding:20px; font-size:11.5px; color:var(--muted); }
+
+  .overlay{ display:none; position:fixed; inset:0; background:rgba(28,27,25,0.45); z-index:50; align-items:flex-end; justify-content:center; }
+  .overlay.open{ display:flex; }
+  .modal{ background:var(--card); width:100%; max-width:440px; border-radius:18px 18px 0 0; padding:22px 22px 26px; max-height:88vh; overflow-y:auto; }
+  @media (min-width:640px){ .overlay{ align-items:center; } .modal{ border-radius:16px; margin-bottom:0; } }
+  .modal h3{ margin:0 0 4px; font-size:16px; font-weight:700; }
+  .modal .sub{ font-size:12.5px; color:var(--muted); margin-bottom:18px; }
+  .field{ margin-bottom:14px; }
+  .field label{ display:block; font-size:12.5px; font-weight:600; margin-bottom:5px; }
+  .field .optional-tag{ font-weight:500; color:var(--muted); text-transform:none; letter-spacing:0; }
+  .field input, .field select{ width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:9px; font-family:'Inter'; font-size:13.5px; background:var(--paper); color:var(--ink); }
+  .field input:focus, .field select:focus{ outline:2px solid var(--teal-soft); border-color:var(--teal); }
+  .barcode-row{ display:flex; gap:8px; }
+  .barcode-row input{ flex:1; }
+  .scan-inline{ flex-shrink:0; width:42px; border:1px solid var(--line); border-radius:9px; background:var(--paper); display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  .modal-actions{ display:flex; gap:10px; margin-top:6px; }
+  .modal-actions button{ flex:1; padding:11px 0; border-radius:9px; font-size:13.5px; font-weight:700; cursor:pointer; border:1px solid var(--line); }
+  .modal-actions .cancel{ background:var(--card); color:var(--ink); }
+  .modal-actions .save{ background:var(--teal); border-color:var(--teal); color:#fff; }
+  .modal-actions .danger{ background:var(--red); border-color:var(--red); color:#fff; }
+
+  .image-upload{ display:flex; align-items:center; gap:12px; }
+  .image-preview{ width:56px; height:56px; border-radius:9px; background:var(--teal-soft); display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0; border:1px dashed var(--line); }
+  .upload-btn{ flex:1; padding:10px 12px; border:1px dashed var(--line); border-radius:9px; text-align:center; font-size:12.5px; font-weight:600; color:var(--muted); cursor:pointer; background:var(--paper); }
+  .fallback-note{ font-size:11.5px; color:var(--muted); margin-top:6px; line-height:1.4; }
+
+  .toast{ position:fixed; bottom:26px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--ink); color:#fff; font-size:13px; font-weight:600; padding:11px 18px; border-radius:10px; z-index:60; opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; max-width:88%; text-align:center; }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  /* Cart modal */
+  .cart-modal .modal{ max-width:460px; }
+  .cart-line{ display:flex; align-items:center; gap:10px; padding:11px 0; border-bottom:1px solid var(--line); }
+  .cart-line .cl-info{ flex:1; }
+  .cart-line .cl-name{ font-size:13px; font-weight:600; }
+  .cart-line .cl-variant{ font-size:11.5px; color:var(--muted); }
+  .cart-line .cl-price{ font-size:13px; font-weight:700; color:var(--teal); font-family:'IBM Plex Mono',monospace; }
+  .qty-stepper{ display:flex; align-items:center; gap:6px; }
+  .qty-stepper button{ width:24px; height:24px; border-radius:6px; border:1px solid var(--line); background:var(--paper); font-weight:800; cursor:pointer; }
+  .qty-stepper span{ font-size:13px; font-weight:600; min-width:16px; text-align:center; }
+  .cart-del{ width:26px; height:26px; border-radius:7px; border:1px solid var(--red-soft); background:var(--red-soft); color:var(--red); cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+  .cart-empty{ text-align:center; padding:30px 0; color:var(--muted); font-size:13px; }
+  .cart-total-row{ display:flex; justify-content:space-between; align-items:baseline; margin:14px 0 6px; font-size:14px; font-weight:700; }
+  .cart-total-row .amt{ font-size:19px; font-family:'IBM Plex Mono',monospace; color:var(--teal); }
+  .place-order-btn{ width:100%; padding:13px 0; border-radius:10px; border:none; background:#0A66FF; color:#fff; font-size:14px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; }
+  .place-order-btn:hover{ background:#0952CC; }
+  .cart-note{ font-size:11px; color:var(--muted); text-align:center; margin-top:10px; line-height:1.4; }
+
+  @media (max-width:640px){
+    header{ padding:14px 16px 12px; } main{ padding:18px 16px 30px; }
+    .grid{ grid-template-columns:repeat(2,1fr); gap:10px; }
+    .card{ padding:10px; gap:7px; border-radius:12px; }
+    .thumb{ font-size:18px; border-radius:8px; }
+    .name{ font-size:12px; } .brand-line{ font-size:10px; }
+    .variant-row{ font-size:11px; padding:3px 0; } .variant-row .amt{ font-size:13px; }
+    .add-btn{ width:21px; height:21px; font-size:13px; }
+    .search{ order:3; max-width:none; flex-basis:100%; }
+    .price-toggle{ width:150px; }
+    .admin-row button, .stock-btn{ font-size:10px; padding:6px 0; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="top-row">
+    <div class="brand">
+      <div class="brand-mark">P</div>
+      <div><h1>Pricebook</h1><span>quick lookup for the shop floor</span></div>
+    </div>
+
+    <div class="search">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input type="text" placeholder="Search product or variant…" />
+    </div>
+
+    <div class="icon-btn" title="Scan barcode" onclick="showToast('Camera would open here — scanning the main product barcode jumps straight to that card.')">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+    </div>
+
+    <div class="icon-btn" title="My cart" onclick="openModal('cartModal'); renderCart();">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+      <span class="cart-count" id="cartCount" style="display:none;">0</span>
+    </div>
+
+    <div class="price-toggle retail" id="priceToggle">
+      <div class="knob"></div>
+      <button onclick="setMode('retail')">Retail</button>
+      <button onclick="setMode('wholesale')">Wholesale</button>
+    </div>
+
+    <div class="admin-zone">
+      <span class="admin-badge"><span class="dot"></span> Admin</span>
+      <button class="admin-btn" id="adminBtn" onclick="handleAdminBtn()">Admin Login</button>
+    </div>
+  </div>
+
+  <div class="chips">
+    <div class="chip active">All</div>
+    <div class="chip">Softdrinks</div>
+    <div class="chip">Snacks</div>
+    <div class="chip">Biscuits</div>
+    <div class="chip">Canned Goods</div>
+    <div class="chip">Instant Noodles</div>
+  </div>
+</header>
+
+<main>
+  <div class="section-label"><h2>Softdrinks</h2><span class="count">6 items</span></div>
+  <div class="grid" id="grid-softdrinks"></div>
+  <div class="section-label"><h2>Snacks</h2><span class="count">4 items</span></div>
+  <div class="grid" id="grid-snacks"></div>
+  <div class="section-label"><h2>Biscuits</h2><span class="count">3 items</span></div>
+  <div class="grid" id="grid-biscuits"></div>
+</main>
+
+<button class="fab-add" onclick="openModal('addModal')">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+  Add item
+</button>
+
+<!-- Login modal -->
+<div class="overlay" id="loginModal" onclick="if(event.target===this) closeModal('loginModal')">
+  <div class="modal">
+    <h3>Admin login</h3>
+    <div class="sub">Demo only — any password works here.</div>
+    <div class="field"><label>Password</label><input type="password" id="loginInput" placeholder="Enter admin password" /></div>
+    <div class="modal-actions">
+      <button class="cancel" onclick="closeModal('loginModal')">Cancel</button>
+      <button class="save" onclick="submitLogin()">Log in</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add item modal -->
+<div class="overlay" id="addModal" onclick="if(event.target===this) closeModal('addModal')">
+  <div class="modal">
+    <h3>Add new item</h3>
+    <div class="sub">Variants and prices can be added right after you save the base product.</div>
+    <div class="field"><label>Product name</label><input type="text" placeholder="e.g. Coca-Cola" /></div>
+    <div class="field"><label>Brand</label><input type="text" placeholder="e.g. Coca-Cola Co." /></div>
+    <div class="field">
+      <label>Category</label>
+      <select id="newItemCategory">
+        <option value="softdrinks">Softdrinks</option>
+        <option value="snacks">Snacks</option>
+        <option value="biscuits">Biscuits</option>
+        <option value="canned">Canned Goods</option>
+        <option value="noodles">Instant Noodles</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Barcode <span class="optional-tag">— optional, one per product</span></label>
+      <div class="barcode-row">
+        <input type="text" placeholder="Leave blank if none" />
+        <div class="scan-inline" onclick="showToast('Camera would open here to scan the barcode into this field.')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        </div>
+      </div>
+      <div class="fallback-note">One barcode covers all variants of this product — scanning it opens the full card so you pick the size manually.</div>
+    </div>
+    <div class="field">
+      <label>Photo <span class="optional-tag">— optional</span></label>
+      <div class="image-upload">
+        <div class="image-preview" id="newItemPreview">🥤</div>
+        <div class="upload-btn" onclick="showToast('Would open your camera or photo library.')">Tap to upload</div>
+      </div>
+      <div class="fallback-note">No photo? We'll show your category's default emoji instead — it updates automatically based on the category you picked above.</div>
+    </div>
+    <div class="modal-actions">
+      <button class="cancel" onclick="closeModal('addModal')">Cancel</button>
+      <button class="save" onclick="showToast('Would save product, then take you to add its first variant + price.'); closeModal('addModal')">Save & continue</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete confirm modal -->
+<div class="overlay" id="deleteModal" onclick="if(event.target===this) closeModal('deleteModal')">
+  <div class="modal">
+    <h3>Delete item?</h3>
+    <div class="sub" id="deleteMessage">This will remove it and its price history. This can't be undone.</div>
+    <div class="modal-actions">
+      <button class="cancel" onclick="closeModal('deleteModal')">Cancel</button>
+      <button class="danger" onclick="confirmDelete()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Cart modal -->
+<div class="overlay cart-modal" id="cartModal" onclick="if(event.target===this) closeModal('cartModal')">
+  <div class="modal">
+    <h3>My Cart</h3>
+    <div class="sub">Review your items, then send your order to us on Messenger.</div>
+    <div id="cartLines"></div>
+    <div id="cartFooter"></div>
+  </div>
+</div>
+
+<!-- Variant picker modal: opened from a product's single Add to cart button -->
+<div class="overlay" id="variantModal" onclick="if(event.target===this) closeModal('variantModal')">
+  <div class="modal">
+    <div class="vm-header">
+      <div class="vm-thumb" id="vmThumb"></div>
+      <div>
+        <h3 id="vmName" style="margin-bottom:1px;"></h3>
+        <div class="sub" style="margin-bottom:0;" id="vmBrand"></div>
+      </div>
+    </div>
+    <div id="vmLines"></div>
+    <div class="vm-summary"><span>Selected</span><span class="amt" id="vmTotal">₱0.00</span></div>
+    <button class="confirm-add-btn" id="vmConfirmBtn" onclick="confirmAddVariants()" disabled>Add to cart</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<footer>Mockup only — static data, for layout review.</footer>
+
+<script>
+const CATEGORY_EMOJI = { softdrinks:'🥤', snacks:'🍿', biscuits:'🍪', canned:'🥫', noodles:'🍜' };
+const CATEGORY_LABEL = { softdrinks:'Softdrinks', snacks:'Snacks', biscuits:'Biscuits', canned:'Canned Goods', noodles:'Instant Noodles' };
+
+const DATA = {
+  softdrinks: [
+    { name:'Coca-Cola', brand:'Coca-Cola Co.', changed:true, oos:false, barcode:'4801234567890', image:null,
+      variants:[ {label:'330ml Can', retail:22, wholesale:18}, {label:'1L Bottle', retail:55, wholesale:46}, {label:'1.5L Bottle', retail:78, wholesale:65} ]},
+    { name:'Sprite', brand:'Coca-Cola Co.', changed:false, oos:false, barcode:'4801234567906', image:null,
+      variants:[ {label:'330ml Can', retail:22, wholesale:18}, {label:'1.5L Bottle', retail:76, wholesale:63} ]},
+    { name:'Royal', brand:'Coca-Cola Co.', changed:false, oos:true, barcode:null, image:null,
+      variants:[ {label:'295ml', retail:20, wholesale:16}, {label:'1L', retail:52, wholesale:44} ]},
+    { name:'Pepsi', brand:'PepsiCo', changed:true, oos:false, barcode:'4805012349876', image:null,
+      variants:[ {label:'330ml Can', retail:21, wholesale:17}, {label:'1.5L', retail:74, wholesale:61} ]},
+    { name:'Mountain Dew', brand:'PepsiCo', changed:false, oos:false, barcode:null, image:null,
+      variants:[ {label:'330ml Can', retail:22, wholesale:18} ]},
+    { name:'Mirinda', brand:'PepsiCo', changed:false, oos:false, barcode:'4805012349883', image:null,
+      variants:[ {label:'295ml', retail:20, wholesale:16}, {label:'1L', retail:50, wholesale:42} ]},
+  ],
+  snacks: [
+    { name:'Piattos', brand:'Jack n Jill', changed:false, oos:false, barcode:'4800016543210', image:null,
+      variants:[{label:'40g', retail:24, wholesale:20},{label:'85g', retail:45, wholesale:38}]},
+    { name:'Nova', brand:'Jack n Jill', changed:true, oos:false, barcode:null, image:null,
+      variants:[{label:'78g', retail:22, wholesale:18}]},
+    { name:'Chippy', brand:'Jack n Jill', changed:false, oos:false, barcode:'4800016543227', image:null,
+      variants:[{label:'110g', retail:22, wholesale:18},{label:'150g', retail:30, wholesale:25}]},
+    { name:'Clover Chips', brand:"Leslie's", changed:false, oos:false, barcode:null, image:null,
+      variants:[{label:'60g', retail:15, wholesale:12}]},
+  ],
+  biscuits: [
+    { name:'Rebisco Crackers', brand:'Rebisco', changed:false, oos:false, barcode:'4800088123456', image:null,
+      variants:[{label:'32g Pack', retail:8, wholesale:6},{label:'10-pack', retail:75, wholesale:60}]},
+    { name:'Fita', brand:'Monde Nissin', changed:true, oos:false, barcode:null, image:null,
+      variants:[{label:'250g', retail:38, wholesale:31}]},
+    { name:'SkyFlakes', brand:'M.Y. San', changed:false, oos:false, barcode:'4800088123463', image:null,
+      variants:[{label:'32g Pack', retail:9, wholesale:7}]},
+  ],
+};
+
+let mode = 'retail';
+let isAdmin = false;
+let pendingDelete = null;
+let toastTimer = null;
+
+// In-memory cart. In the real Next.js app this same shape would be
+// persisted to localStorage instead (see chat note re: sandboxed preview).
+let cart = [];
+
+function currency(n){ return '₱' + n.toLocaleString('en-PH', {minimumFractionDigits:2}); }
+
+function render(){
+  Object.entries(DATA).forEach(([cat, items]) => {
+    document.getElementById('grid-' + cat).innerHTML = items.map((item, idx) => cardHTML(item, cat, idx)).join('');
+  });
+}
+
+function cardHTML(item, cat, idx){
+  const thumbContent = item.image ? `<img src="${item.image}" alt="${item.name}">` : CATEGORY_EMOJI[cat];
+  return `
+    <div class="card ${item.oos ? 'out-of-stock' : ''}">
+      <div class="thumb">
+        ${thumbContent}
+        ${item.oos ? `<div class="oos-badge">Unavailable</div>` : ''}
+        ${(!item.oos && item.changed) ? `<div class="change-badge">↑ new</div>` : ''}
+        ${item.barcode ? `<div class="barcode-badge">barcode ✓</div>` : ''}
+      </div>
+      <div>
+        <div class="name">${item.name}</div>
+        <div class="brand-line">${item.brand}</div>
+      </div>
+      <div class="variant-list">
+        <div class="mode-tag">${mode} price</div>
+        ${item.variants.map((vv) => `
+          <div class="variant-row">
+            <span class="lbl">${vv.label}</span>
+            <span class="amt ${mode}-mode mono">${currency(mode === 'retail' ? vv.retail : vv.wholesale)}</span>
+          </div>
+        `).join('')}
+      </div>
+      <button class="card-add-btn" onclick="openVariantModal('${cat}', ${idx})">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+        Add to cart
+      </button>
+      <div class="admin-controls">
+        <button class="stock-btn" onclick="toggleStock('${cat}', ${idx})">${item.oos ? 'Mark in stock' : 'Mark out of stock'}</button>
+        <div class="admin-row">
+          <button class="edit" onclick="showToast('Would open edit form for ${item.name}')">Edit</button>
+          <button class="del" onclick="askDelete('${cat}', ${idx}, '${item.name}')">Delete</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function toggleStock(cat, idx){ DATA[cat][idx].oos = !DATA[cat][idx].oos; render(); }
+
+function setMode(m){
+  mode = m;
+  document.getElementById('priceToggle').className = 'price-toggle ' + m;
+  render();
+}
+
+function openModal(id){ document.getElementById(id).classList.add('open'); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+
+function handleAdminBtn(){
+  if(isAdmin){
+    isAdmin = false;
+    document.body.classList.remove('is-admin');
+    document.getElementById('adminBtn').textContent = 'Admin Login';
+    showToast('Logged out.');
+  } else {
+    document.getElementById('loginInput').value = '';
+    openModal('loginModal');
+  }
+}
+
+function submitLogin(){
+  isAdmin = true;
+  document.body.classList.add('is-admin');
+  document.getElementById('adminBtn').textContent = 'Log out';
+  closeModal('loginModal');
+  showToast('Logged in as admin.');
+}
+
+function askDelete(cat, idx, name){
+  pendingDelete = {cat, idx};
+  document.getElementById('deleteMessage').textContent = `Delete "${name}"? This removes it and its price history. This can't be undone.`;
+  openModal('deleteModal');
+}
+
+function confirmDelete(){
+  if(pendingDelete){
+    const {cat, idx} = pendingDelete;
+    const name = DATA[cat][idx].name;
+    DATA[cat].splice(idx, 1);
+    render();
+    showToast(`Deleted ${name}.`);
+    pendingDelete = null;
+  }
+  closeModal('deleteModal');
+}
+
+/* ---------- Cart ---------- */
+let variantModalTarget = null; // {cat, idx}
+let variantQtys = {};          // { vi: qty }
+
+function openVariantModal(cat, idx){
+  const item = DATA[cat][idx];
+  if(item.oos) return;
+  variantModalTarget = { cat, idx };
+  variantQtys = {};
+  item.variants.forEach((_, vi) => { variantQtys[vi] = 0; });
+
+  document.getElementById('vmThumb').textContent = item.image ? '' : CATEGORY_EMOJI[cat];
+  document.getElementById('vmName').textContent = item.name;
+  document.getElementById('vmBrand').textContent = item.brand;
+
+  renderVariantModal();
+  openModal('variantModal');
+}
+
+function renderVariantModal(){
+  const { cat, idx } = variantModalTarget;
+  const item = DATA[cat][idx];
+  const linesEl = document.getElementById('vmLines');
+
+  linesEl.innerHTML = item.variants.map((vv, vi) => {
+    const price = mode === 'retail' ? vv.retail : vv.wholesale;
+    const qty = variantQtys[vi];
+    return `
+      <div class="vm-line">
+        <div class="vm-info">
+          <div class="vm-label">${vv.label}</div>
+          <div class="vm-price ${mode}-mode">${currency(price)}</div>
+        </div>
+        <div class="vm-stepper">
+          <button onclick="stepVariantQty(${vi}, -1)" ${qty === 0 ? 'disabled' : ''}>−</button>
+          <span>${qty}</span>
+          <button onclick="stepVariantQty(${vi}, 1)">+</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const totalQty = Object.values(variantQtys).reduce((a,b) => a+b, 0);
+  const totalAmt = item.variants.reduce((sum, vv, vi) => {
+    const price = mode === 'retail' ? vv.retail : vv.wholesale;
+    return sum + price * variantQtys[vi];
+  }, 0);
+
+  document.getElementById('vmTotal').textContent = currency(totalAmt);
+  const confirmBtn = document.getElementById('vmConfirmBtn');
+  confirmBtn.disabled = totalQty === 0;
+  confirmBtn.textContent = totalQty === 0 ? 'Add to cart' : `Add ${totalQty} item${totalQty > 1 ? 's' : ''} to cart`;
+}
+
+function stepVariantQty(vi, delta){
+  variantQtys[vi] = Math.max(0, (variantQtys[vi] || 0) + delta);
+  renderVariantModal();
+}
+
+function confirmAddVariants(){
+  const { cat, idx } = variantModalTarget;
+  const item = DATA[cat][idx];
+  let addedCount = 0;
+
+  item.variants.forEach((vv, vi) => {
+    const qty = variantQtys[vi];
+    if(qty <= 0) return;
+    const key = `${cat}-${idx}-${vi}`;
+    const existing = cart.find(l => l.key === key);
+    const unitPrice = mode === 'retail' ? vv.retail : vv.wholesale;
+    if(existing){
+      existing.qty += qty;
+    } else {
+      cart.push({ key, cat, idx, vi, name:item.name, variantLabel:vv.label, unitPrice, qty });
+    }
+    addedCount += qty;
+  });
+
+  updateCartBadge();
+  closeModal('variantModal');
+  showToast(`Added ${addedCount} item${addedCount > 1 ? 's' : ''} from ${item.name} to cart.`);
+}
+
+function updateCartBadge(){
+  const count = cart.reduce((sum, l) => sum + l.qty, 0);
+  const badge = document.getElementById('cartCount');
+  badge.textContent = count;
+  badge.style.display = count > 0 ? 'flex' : 'none';
+}
+
+function changeQty(key, delta){
+  const line = cart.find(l => l.key === key);
+  if(!line) return;
+  line.qty += delta;
+  if(line.qty <= 0) cart = cart.filter(l => l.key !== key);
+  updateCartBadge();
+  renderCart();
+}
+
+function removeFromCart(key){
+  cart = cart.filter(l => l.key !== key);
+  updateCartBadge();
+  renderCart();
+}
+
+function renderCart(){
+  const linesEl = document.getElementById('cartLines');
+  const footerEl = document.getElementById('cartFooter');
+
+  if(cart.length === 0){
+    linesEl.innerHTML = `<div class="cart-empty">Your cart is empty — tap the + next to any item to add it.</div>`;
+    footerEl.innerHTML = '';
+    return;
+  }
+
+  linesEl.innerHTML = cart.map(line => `
+    <div class="cart-line">
+      <div class="cl-info">
+        <div class="cl-name">${line.name}</div>
+        <div class="cl-variant">${line.variantLabel} · ${currency(line.unitPrice)} each</div>
+      </div>
+      <div class="qty-stepper">
+        <button onclick="changeQty('${line.key}', -1)">−</button>
+        <span>${line.qty}</span>
+        <button onclick="changeQty('${line.key}', 1)">+</button>
+      </div>
+      <div class="cl-price mono">${currency(line.unitPrice * line.qty)}</div>
+      <button class="cart-del" title="Remove" onclick="removeFromCart('${line.key}')">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>
+      </button>
+    </div>
+  `).join('');
+
+  const total = cart.reduce((sum, l) => sum + l.unitPrice * l.qty, 0);
+  footerEl.innerHTML = `
+    <div class="cart-total-row"><span>Total</span><span class="amt">${currency(total)}</span></div>
+    <button class="place-order-btn" onclick="placeOrder()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/></svg>
+      Place order via Messenger
+    </button>
+    <div class="cart-note">This opens Messenger with your order pre-filled. Just hit send there to confirm with us.</div>
+  `;
+}
+
+function placeOrder(){
+  if(cart.length === 0) return;
+  const total = cart.reduce((sum, l) => sum + l.unitPrice * l.qty, 0);
+  let msg = "Hi! I'd like to order:\\n";
+  cart.forEach(l => { msg += `- ${l.name} (${l.variantLabel}) x${l.qty} — ${currency(l.unitPrice * l.qty)}\\n`; });
+  msg += `Total: ${currency(total)}`;
+
+  // Real app: window.open(`https://m.me/YourPageUsername?text=${encodeURIComponent(msg)}`, '_blank');
+  showToast('Would open Messenger with this order pre-filled — cart cleared.');
+  console.log('Templated Messenger text:\\n' + msg);
+
+  cart = [];
+  updateCartBadge();
+  renderCart();
+  closeModal('cartModal');
+}
+
+/* ---------- Add item modal: emoji preview follows category ---------- */
+document.getElementById('newItemCategory').addEventListener('change', function(){
+  document.getElementById('newItemPreview').textContent = CATEGORY_EMOJI[this.value];
+});
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
+}
+
+render();
+</script>
+
+</body>
+</html>
