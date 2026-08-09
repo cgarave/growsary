@@ -122,7 +122,7 @@ export async function toggleProductStockAction(productId: string, currentStatus:
     data: { isOutOfStock: !currentStatus },
   });
   revalidateTag("catalog", "max");
-  revalidatePath("/");
+  revalidatePath("/", "layout");
 }
 
 export async function deleteProductAction(productId: string) {
@@ -130,7 +130,7 @@ export async function deleteProductAction(productId: string) {
     where: { id: productId },
   });
   revalidateTag("catalog", "max");
-  revalidatePath("/");
+  revalidatePath("/", "layout");
 }
 
 export async function createProductAction(data: {
@@ -175,7 +175,7 @@ export async function createProductAction(data: {
   });
 
   revalidateTag("catalog", "max");
-  revalidatePath("/");
+  revalidatePath("/", "layout");
   return product;
 }
 
@@ -285,7 +285,7 @@ export async function updateProductAction(data: {
   }
 
   revalidateTag("catalog", "max");
-  revalidatePath("/");
+  revalidatePath("/", "layout");
 }
 
 export async function getPriceHistoryAction(variantId: string) {
