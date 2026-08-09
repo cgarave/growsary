@@ -152,7 +152,7 @@ If critical information (like Product Name or Retail Price) cannot be determined
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.0-flash",
       contents,
       config: {
         systemInstruction,
