@@ -639,39 +639,50 @@ export default function CatalogView({
     <div>
       <Toaster position="bottom-center" />
 
-      {/* Header with Tailwind CSS Utility Styling */}
-      <header className="sticky top-0 z-20 bg-paper border-b border-line px-4 sm:px-7 py-4.5">
-        <div className="flex items-center justify-between gap-3.5 flex-wrap">
-          <div className="flex items-baseline gap-2.5">
-            <div className="w-[30px] h-[30px] rounded-lg bg-teal text-white flex items-center justify-center font-extrabold text-sm shrink-0">
-              G
-            </div>
+      {/* Header matching exact HTML mockup markup */}
+      <header>
+        <div className="top-row">
+          <div className="brand">
+            <div className="brand-mark">P</div>
             <div>
-              <h1 className="text-[17px] font-bold m-0 tracking-tight text-ink">Growsary</h1>
-              <span className="text-xs text-muted">Track your prices in seconds</span>
+              <h1>Growsary</h1>
+              <span>quick lookup for the shop floor</span>
             </div>
           </div>
 
-          <div className="flex-1 min-w-[160px] max-w-[340px] flex items-center gap-2 bg-card border border-line rounded-xl px-3 py-2 order-3 sm:order-none max-sm:w-full max-sm:max-w-none">
-            <Search className="w-3.75 h-3.75 shrink-0 opacity-45 text-ink" />
+          <div className="search">
+            <Search width="15" height="15" />
             <input
               type="text"
               placeholder="Search product or variant…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="border-none outline-none bg-transparent w-full text-sm text-ink placeholder:text-muted"
             />
           </div>
 
           {/* Inline Admin Action Bar placed directly below / beside search */}
           {isAdmin && (
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="admin-actions-bar" style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
               <button
                 type="button"
+                className="add-item-btn"
                 onClick={() => setIsAddProductOpen(true)}
-                className="px-3.5 py-2 rounded-xl bg-teal text-white border-none inline-flex items-center gap-1.5 text-[12.5px] font-bold cursor-pointer whitespace-nowrap shadow-sm hover:opacity-90 transition-opacity"
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: "9px",
+                  background: "var(--teal)",
+                  color: "#ffffff",
+                  border: "none",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  fontSize: "12.5px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
               >
-                <Plus className="w-3.75 h-3.75" />
+                <Plus width="15" height="15" />
                 Add item
               </button>
               <AdminAiChatbot existingCategories={categories.map((c) => c.name)} />
@@ -679,92 +690,61 @@ export default function CatalogView({
           )}
 
           <div
+            className="icon-btn"
             title="Scan barcode"
             onClick={() => {
               setScannerTarget("search");
               setIsScannerOpen(true);
             }}
-            className="flex items-center justify-center w-9 h-9 rounded-xl border border-line bg-card cursor-pointer shrink-0 text-ink relative hover:bg-teal-soft hover:border-teal transition-colors"
           >
-            <Camera className="w-4.25 h-4.25" />
+            <Camera width="17" height="17" />
           </div>
 
           <div
+            className="icon-btn"
             title="My cart"
             onClick={() => setIsCartOpen(true)}
-            className="flex items-center justify-center w-9 h-9 rounded-xl border border-line bg-card cursor-pointer shrink-0 text-ink relative hover:bg-teal-soft hover:border-teal transition-colors"
           >
-            <ShoppingBag className="w-4.25 h-4.25" />
+            <ShoppingBag width="17" height="17" />
             {totalCartCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 bg-red text-white text-[10px] font-bold w-4.5 h-4.5 rounded-full flex items-center justify-center">
-                {totalCartCount}
-              </span>
+              <span className="cart-count">{totalCartCount}</span>
             )}
           </div>
 
-          <div className="flex items-center bg-card border border-line rounded-full p-[3px] relative w-[150px] sm:w-[190px] shrink-0">
-            <div
-              className={`absolute top-[3px] left-[3px] w-[calc(50%-3px)] h-[calc(100%-6px)] rounded-full transition-transform duration-200 cubic-bezier(0.4,0,0.2,1) ${
-                priceMode === "retail"
-                  ? "bg-teal translate-x-0"
-                  : "bg-amber translate-x-full"
-              }`}
-            />
-            <button
-              onClick={() => setPriceMode("retail")}
-              className={`flex-1 z-10 bg-transparent border-none py-1.5 sm:py-2 px-1 text-[11px] sm:text-xs font-semibold tracking-wider cursor-pointer transition-colors ${
-                priceMode === "retail" ? "text-white" : "text-muted"
-              }`}
-            >
-              Retail
-            </button>
-            <button
-              onClick={() => setPriceMode("wholesale")}
-              className={`flex-1 z-10 bg-transparent border-none py-1.5 sm:py-2 px-1 text-[11px] sm:text-xs font-semibold tracking-wider cursor-pointer transition-colors ${
-                priceMode === "wholesale" ? "text-white" : "text-muted"
-              }`}
-            >
-              Wholesale
-            </button>
+          <div className={`price-toggle ${priceMode}`} id="priceToggle">
+            <div className="knob"></div>
+            <button onClick={() => setPriceMode("retail")}>Retail</button>
+            <button onClick={() => setPriceMode("wholesale")}>Wholesale</button>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="admin-zone">
             {isAdmin && (
-              <span className="flex items-center gap-1.5 text-xs font-semibold text-teal">
-                <span className="w-1.75 h-1.75 rounded-full bg-teal"></span> Admin
+              <span className="admin-badge">
+                <span className="dot"></span> Admin
               </span>
             )}
             <button
+              className={`admin-btn ${isAdmin ? "is-logged-in" : ""}`}
               onClick={() => (isAdmin ? handleAdminLogout() : setIsLoginOpen(true))}
-              className={`text-[12.5px] font-bold px-3.5 py-2 rounded-full border border-ink bg-ink text-white cursor-pointer whitespace-nowrap transition-colors ${
-                isAdmin ? "bg-red border-red hover:opacity-90" : "hover:bg-opacity-90"
-              }`}
             >
               {isAdmin ? "Log out" : "Admin Login"}
             </button>
           </div>
         </div>
 
-        <div className="flex gap-2 mt-3.5 overflow-x-auto pb-0.5 no-scrollbar">
+        <div className="chips">
           <div
+            className={`chip ${selectedCategory === "All" ? "active" : ""}`}
             onClick={() => setSelectedCategory("All")}
-            className={`text-xs font-semibold px-3.5 py-1.75 rounded-full border whitespace-nowrap cursor-pointer transition-colors ${
-              selectedCategory === "All"
-                ? "bg-teal border-teal text-white"
-                : "bg-card border-line text-ink hover:bg-teal-soft"
-            }`}
           >
             All
           </div>
           {categories.map((c) => (
             <div
               key={c.id}
+              className={`chip ${selectedCategory === c.name ? "active" : ""}`}
               onClick={() => setSelectedCategory(c.name)}
-              className={`text-xs font-semibold px-3.5 py-1.75 rounded-full border whitespace-nowrap cursor-pointer transition-colors inline-flex items-center gap-1.5 ${
-                selectedCategory === c.name
-                  ? "bg-teal border-teal text-white"
-                  : "bg-card border-line text-ink hover:bg-teal-soft"
-              }`}
+              style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
             >
               <span>{c.name}</span>
               {isAdmin && (
@@ -775,9 +755,19 @@ export default function CatalogView({
                     e.stopPropagation();
                     setDeleteCategoryTarget(c);
                   }}
-                  className="bg-transparent border-none p-0.5 cursor-pointer flex items-center opacity-80 hover:opacity-100"
+                  style={{
+                    background: "none",
+                    border: "none",
+                    padding: "2px",
+                    margin: 0,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    color: selectedCategory === c.name ? "var(--paper)" : "var(--muted)",
+                    opacity: 0.8,
+                  }}
                 >
-                  <X className="w-3 h-3" />
+                  <X width="12" height="12" />
                 </button>
               )}
             </div>
@@ -785,78 +775,60 @@ export default function CatalogView({
         </div>
       </header>
 
-      {/* Main Content with Tailwind CSS Layout */}
-      <main className="px-4 sm:px-7 py-6 pb-10 max-w-[1180px] mx-auto">
+      {/* Main Content matching exact HTML mockup layout */}
+      <main>
         {Object.keys(groupedByCategory).length === 0 ? (
-          <div className="text-center py-16 text-muted text-sm">
+          <div className="text-center py-16 text-[var(--muted)]">
             No products match your current search or category filter.
           </div>
         ) : (
           Object.entries(groupedByCategory).map(([catName, catProducts]) => (
             <React.Fragment key={catName}>
-              <div className="flex items-center gap-2.5 my-7.5 mb-3.5 after:content-[''] after:flex-1 after:h-px after:bg-line">
-                <h2 className="text-[15px] font-bold m-0 text-ink">{catName}</h2>
-                <span className="text-xs text-muted">{catProducts.length} items</span>
+              <div className="section-label">
+                <h2>{catName}</h2>
+                <span className="count">{catProducts.length} items</span>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-2.5 sm:gap-3.5">
+              <div className="grid">
                 {catProducts.map((p) => (
                   <div
                     key={p.id}
-                    className={`bg-card border border-line rounded-xl p-2.5 sm:p-3.5 flex flex-col gap-2 relative transition-all duration-150 hover:shadow-md hover:-translate-y-0.5 ${
-                      p.isOutOfStock ? "opacity-75" : ""
-                    }`}
+                    className={`card ${p.isOutOfStock ? "out-of-stock" : ""}`}
                   >
-                    <div className={`w-full aspect-[1/0.7] rounded-lg bg-teal-soft flex items-center justify-center text-xl sm:text-2xl relative overflow-hidden ${
-                      p.isOutOfStock ? "grayscale opacity-50" : ""
-                    }`}>
+                    <div className="thumb">
                       {p.imageUrl ? (
                         <img
                           src={p.imageUrl}
                           alt={p.name}
-                          className="w-full h-full object-cover"
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
                         />
                       ) : (
                         CATEGORY_EMOJIS[catName] || "🥤"
                       )}
-                      {p.isOutOfStock && (
-                        <div className="absolute top-1.75 left-1.75 bg-red text-white text-[10px] font-bold px-2 py-0.75 rounded-full tracking-wider">
-                          Unavailable
-                        </div>
-                      )}
+                      {p.isOutOfStock && <div className="oos-badge">Unavailable</div>}
                       {!p.isOutOfStock && p.hasRecentPriceChange && (
-                        <div className="absolute top-1.75 right-1.75 bg-amber-soft text-amber text-[10.5px] font-bold px-1.75 py-0.75 rounded-full">
-                          ↑ new
-                        </div>
+                        <div className="change-badge">↑ new</div>
                       )}
-                      {p.barcode && (
-                        <div className="absolute bottom-1.5 right-1.5 bg-ink/55 text-white text-[9px] font-semibold px-1.5 py-0.5 rounded tracking-wider">
-                          barcode ✓
-                        </div>
-                      )}
+                      {p.barcode && <div className="barcode-badge">barcode ✓</div>}
                     </div>
 
                     <div>
-                      <div className={`text-xs sm:text-[13.5px] font-semibold leading-snug ${p.isOutOfStock ? "opacity-45" : "text-ink"}`}>
-                        {p.name}
-                      </div>
-                      <div className="text-[10px] sm:text-[11.5px] text-muted -mt-0.5">
-                        {p.brand || "Standard"}
-                      </div>
+                      <div className="name">{p.name}</div>
+                      <div className="brand-line">{p.brand || "Standard"}</div>
                     </div>
 
-                    <div className="flex flex-col border-t border-dashed border-line pt-2">
-                      <div className="text-[9.5px] font-bold tracking-wider uppercase text-muted mb-0.5">
-                        {priceMode} price
-                      </div>
+                    <div className="variant-list">
+                      <div className="mode-tag">{priceMode} price</div>
                       {p.variants.map((v) => (
-                        <div key={v.id} className="flex items-center justify-between py-1 text-xs sm:text-[12.5px] gap-2">
-                          <span className="text-muted font-medium flex-1 truncate">{v.label}</span>
-                          <div className="flex items-center gap-1.5">
-                            <span className={`font-bold font-mono text-sm sm:text-[14.5px] ${
-                              priceMode === "retail" ? "text-teal" : "text-amber"
-                            } ${p.isOutOfStock ? "opacity-45" : ""}`}>
-                              ₱{(priceMode === "retail" ? v.retailPrice : v.wholesalePrice).toFixed(2)}
+                        <div key={v.id} className="variant-row">
+                          <span className="lbl">{v.label}</span>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span className={`amt ${priceMode}-mode mono`}>
+                              ₱
+                              {(priceMode === "retail"
+                                ? v.retailPrice
+                                : v.wholesalePrice
+                              ).toFixed(2)}
                             </span>
                             <button
                               type="button"
@@ -867,9 +839,17 @@ export default function CatalogView({
                                   variant: v,
                                 })
                               }
-                              className="bg-transparent border-none p-0 cursor-pointer text-muted flex items-center hover:text-ink"
+                              style={{
+                                background: "none",
+                                border: "none",
+                                padding: 0,
+                                cursor: "pointer",
+                                color: "var(--muted)",
+                                display: "flex",
+                                alignItems: "center",
+                              }}
                             >
-                              <History className="w-3.25 h-3.25" />
+                              <History width="13" height="13" />
                             </button>
                           </div>
                         </div>
@@ -878,39 +858,32 @@ export default function CatalogView({
 
                     {!isAdmin && (
                       <button
+                        className="card-add-btn"
                         onClick={() => openVariantModal(p)}
-                        disabled={p.isOutOfStock}
-                        className={`w-full py-2.25 rounded-xl border border-teal bg-teal-soft text-teal text-xs sm:text-[12.5px] font-bold cursor-pointer flex items-center justify-center gap-1.5 transition-colors hover:bg-teal hover:text-white ${
-                          p.isOutOfStock ? "pointer-events-none opacity-40" : ""
-                        }`}
                       >
-                        <ShoppingBag className="w-3.5 h-3.5" />
+                        <ShoppingBag width="14" height="14" />
                         Add to cart
                       </button>
                     )}
 
                     {isAdmin && (
-                      <div className="flex flex-col gap-1.5 mt-0.5">
+                      <div className="admin-controls">
                         <button
+                          className="stock-btn"
                           onClick={() => toggleStock(p)}
-                          className={`w-full text-[10px] sm:text-[11.5px] font-bold py-1.5 rounded-lg border cursor-pointer transition-colors ${
-                            p.isOutOfStock
-                              ? "bg-teal border-teal text-white"
-                              : "bg-paper border-line text-ink hover:bg-teal-soft"
-                          }`}
                         >
                           {p.isOutOfStock ? "Mark in stock" : "Mark out of stock"}
                         </button>
-                        <div className="flex gap-1.5">
+                        <div className="admin-row">
                           <button
+                            className="edit"
                             onClick={() => openEditModal(p)}
-                            className="flex-1 text-[10px] sm:text-[11.5px] font-bold py-1.5 rounded-lg border border-line bg-paper text-ink cursor-pointer hover:bg-teal-soft hover:border-teal transition-colors"
                           >
                             Edit
                           </button>
                           <button
+                            className="del"
                             onClick={() => setDeleteTarget(p)}
-                            className="flex-1 text-[10px] sm:text-[11.5px] font-bold py-1.5 rounded-lg border border-red-soft bg-red-soft text-red cursor-pointer hover:bg-red hover:text-white transition-colors"
                           >
                             Delete
                           </button>
