@@ -133,6 +133,34 @@ export async function deleteProductAction(productId: string) {
   revalidatePath("/", "layout");
 }
 
+export async function deleteCategoryAction(categoryId: string) {
+  const category = await prisma.category.findUnique({
+    where: { id: categoryId },
+    include: {
+      _count: {
+        select: { products: true },
+      },
+    },
+  });
+
+  if (!category) {
+    throw new Error("Category not found");
+  }
+
+  if (category._count.products > 0) {
+    throw new Error(
+      `Cannot delete "${category.name}" because it still has ${category._count.products} product(s) assigned to it.`
+    );
+  }
+
+  await prisma.category.delete({
+    where: { id: categoryId },
+  });
+
+  revalidateTag("catalog", "max");
+  revalidatePath("/", "layout");
+}
+
 export async function createProductAction(data: {
   name: string;
   brand?: string;

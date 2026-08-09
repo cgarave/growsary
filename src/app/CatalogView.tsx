@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Search, Camera, ShoppingBag, Plus, Trash2, History } from "lucide-react";
+import { Search, Camera, ShoppingBag, Plus, Trash2, History, X } from "lucide-react";
 import {
   CatalogCategory,
   CatalogProduct,
@@ -9,6 +9,7 @@ import {
   createProductAction,
   updateProductAction,
   deleteProductAction,
+  deleteCategoryAction,
   toggleProductStockAction,
 } from "./actions";
 import { authClient } from "@/lib/auth-client";
@@ -124,6 +125,7 @@ export default function CatalogView({
   const [newProdWholesale, setNewProdWholesale] = useState("");
 
   const [deleteTarget, setDeleteTarget] = useState<CatalogProduct | null>(null);
+  const [deleteCategoryTarget, setDeleteCategoryTarget] = useState<CatalogCategory | null>(null);
 
   // Edit Modal State
   const [editTarget, setEditTarget] = useState<CatalogProduct | null>(null);
@@ -519,6 +521,42 @@ export default function CatalogView({
     });
   };
 
+  const handleDeleteCategory = async () => {
+    if (!deleteCategoryTarget) return;
+
+    const targetId = deleteCategoryTarget.id;
+    const targetName = deleteCategoryTarget.name;
+
+    // Check if category has products connected locally
+    const assignedProductsCount = products.filter((p) => p.categoryName === targetName).length;
+
+    if (assignedProductsCount > 0) {
+      toast.error(
+        `Cannot delete "${targetName}" because it has ${assignedProductsCount} product(s) connected to it.`
+      );
+      setDeleteCategoryTarget(null);
+      return;
+    }
+
+    // 1. INSTANT OPTIMISTIC CLIENT UPDATE
+    setCategories((prev) => prev.filter((c) => c.id !== targetId));
+    if (selectedCategory === targetName) {
+      setSelectedCategory("All");
+    }
+    toast.error(`Deleted category "${targetName}"`);
+    setDeleteCategoryTarget(null);
+
+    // 2. BACKGROUND SERVER PERSISTENCE WITH CACHE PURGE
+    try {
+      await deleteCategoryAction(targetId);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to delete category from database");
+      // Revert optimistic client deletion if server failed
+      setCategories(initialCategories);
+    }
+  };
+
   // Filter products by category and search term
   const filteredProducts = products.filter((p) => {
     const matchesCat = selectedCategory === "All" || p.categoryName === selectedCategory;
@@ -616,8 +654,32 @@ export default function CatalogView({
               key={c.id}
               className={`chip ${selectedCategory === c.name ? "active" : ""}`}
               onClick={() => setSelectedCategory(c.name)}
+              style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
             >
-              {c.name}
+              <span>{c.name}</span>
+              {isAdmin && (
+                <button
+                  type="button"
+                  title={`Delete category "${c.name}"`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDeleteCategoryTarget(c);
+                  }}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    padding: "2px",
+                    margin: 0,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    color: selectedCategory === c.name ? "var(--paper)" : "var(--muted)",
+                    opacity: 0.8,
+                  }}
+                >
+                  <X width="12" height="12" />
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -1167,7 +1229,7 @@ export default function CatalogView({
         </div>
       )}
 
-      {/* Delete Modal */}
+      {/* Delete Product Modal */}
       {deleteTarget && (
         <div className="overlay" onClick={(e) => e.target === e.currentTarget && setDeleteTarget(null)}>
           <div className="modal">
@@ -1181,6 +1243,26 @@ export default function CatalogView({
               </button>
               <button type="button" className="danger" onClick={handleDeleteProduct}>
                 Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Category Modal */}
+      {deleteCategoryTarget && (
+        <div className="overlay" onClick={(e) => e.target === e.currentTarget && setDeleteCategoryTarget(null)}>
+          <div className="modal">
+            <h3>Delete category?</h3>
+            <div className="sub">
+              Are you sure you want to delete the category &quot;{deleteCategoryTarget.name}&quot;?
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="cancel" onClick={() => setDeleteCategoryTarget(null)}>
+                Cancel
+              </button>
+              <button type="button" className="danger" onClick={handleDeleteCategory}>
+                Delete Category
               </button>
             </div>
           </div>
