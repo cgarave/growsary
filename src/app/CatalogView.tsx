@@ -17,6 +17,7 @@ import { authClient } from "@/lib/auth-client";
 import { toast, Toaster } from "sonner";
 import BarcodeScannerModal from "@/components/BarcodeScannerModal";
 import PriceHistoryModal from "@/components/PriceHistoryModal";
+import AdminAiChatbot from "@/components/AdminAiChatbot";
 
 interface CatalogViewProps {
   initialCategories: CatalogCategory[];
@@ -859,12 +860,15 @@ export default function CatalogView({
         )}
       </main>
 
-      {/* Floating Action Button for Admin */}
+      {/* Floating Action Buttons for Admin */}
       {isAdmin && (
-        <button className="fab-add" onClick={() => setIsAddProductOpen(true)}>
-          <Plus width="16" height="16" />
-          Add item
-        </button>
+        <>
+          <AdminAiChatbot existingCategories={categories.map((c) => c.name)} />
+          <button className="fab-add" onClick={() => setIsAddProductOpen(true)}>
+            <Plus width="16" height="16" />
+            Add item
+          </button>
+        </>
       )}
 
       {/* Admin Login / Sign Up Modal */}
