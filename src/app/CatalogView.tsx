@@ -651,6 +651,35 @@ export default function CatalogView({
             />
           </div>
 
+          {/* Inline Admin Action Bar placed directly below / beside search */}
+          {isAdmin && (
+            <div className="admin-actions-bar" style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className="add-item-btn"
+                onClick={() => setIsAddProductOpen(true)}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: "9px",
+                  background: "var(--teal)",
+                  color: "#ffffff",
+                  border: "none",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  fontSize: "12.5px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <Plus width="15" height="15" />
+                Add item
+              </button>
+              <AdminAiChatbot existingCategories={categories.map((c) => c.name)} />
+            </div>
+          )}
+
           <div
             className="icon-btn"
             title="Scan barcode"
@@ -859,17 +888,6 @@ export default function CatalogView({
           ))
         )}
       </main>
-
-      {/* Floating Action Buttons for Admin */}
-      {isAdmin && (
-        <>
-          <AdminAiChatbot existingCategories={categories.map((c) => c.name)} />
-          <button className="fab-add" onClick={() => setIsAddProductOpen(true)}>
-            <Plus width="16" height="16" />
-            Add item
-          </button>
-        </>
-      )}
 
       {/* Admin Login / Sign Up Modal */}
       {isLoginOpen && (

@@ -544,34 +544,53 @@ main {
   z-index: 30;
 }
 
-/* Modals & Overlays */
+/* Modals & Overlays - Mobile Friendly Sheet Drawers */
 .overlay {
   display: flex;
   position: fixed;
   inset: 0;
-  background: rgba(28,27,25,0.45);
+  background: rgba(28,27,25,0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   z-index: 50;
   align-items: flex-end;
   justify-content: center;
+  padding: 0;
+  animation: fadeInOverlay 0.2s ease-out forwards;
 }
 
 .modal {
   background: var(--card);
   width: 100%;
-  max-width: 440px;
-  border-radius: 18px 18px 0 0;
-  padding: 22px 22px 26px;
-  max-height: 88vh;
+  max-width: 480px;
+  border-radius: 20px 20px 0 0;
+  padding: 24px 20px 30px;
+  max-height: 90vh;
   overflow-y: auto;
+  box-shadow: 0 -8px 30px rgba(0,0,0,0.18);
+  animation: slideUpSheet 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  -webkit-overflow-scrolling: touch;
+}
+
+@keyframes fadeInOverlay {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUpSheet {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
 }
 
 @media (min-width:640px) {
   .overlay {
     align-items: center;
+    padding: 20px;
   }
   .modal {
     border-radius: 16px;
     margin-bottom: 0;
+    max-height: 85vh;
   }
 }
 

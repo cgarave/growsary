@@ -131,56 +131,64 @@ export default function AdminAiChatbot({ existingCategories }: AdminAiChatbotPro
 
   return (
     <>
-      {/* AI Floating Action Button next to Add Item */}
+      {/* AI Assistant Button Component */}
       <button
         type="button"
-        className="fab-ai"
+        className="ai-assistant-btn"
         onClick={() => setIsOpen((prev) => !prev)}
         style={{
-          position: "fixed",
-          bottom: "24px",
-          right: "135px",
-          height: "48px",
-          padding: "0 18px",
-          borderRadius: "24px",
+          padding: "8px 14px",
+          borderRadius: "9px",
           background: "linear-gradient(135deg, #6366f1 0%, #a855f7 100%)",
           color: "#ffffff",
           border: "none",
-          boxShadow: "0 6px 20px rgba(168, 85, 247, 0.35)",
-          display: "flex",
+          boxShadow: "0 2px 8px rgba(168, 85, 247, 0.25)",
+          display: "inline-flex",
           alignItems: "center",
-          gap: "8px",
-          fontSize: "14px",
+          gap: "6px",
+          fontSize: "12.5px",
           fontWeight: 700,
           cursor: "pointer",
-          zIndex: 90,
-          transition: "transform 0.2s ease, box-shadow 0.2s ease",
+          whiteSpace: "nowrap",
+          transition: "transform 0.15s ease, opacity 0.15s ease",
         }}
       >
-        <Sparkles width="18" height="18" />
+        <Sparkles width="15" height="15" />
         AI Assistant
       </button>
 
-      {/* AI Chat Drawer / Modal */}
+      {/* AI Chat Drawer / Modal - Mobile Friendly */}
       {isOpen && (
         <div
+          className="ai-chat-overlay"
+          onClick={(e) => e.target === e.currentTarget && setIsOpen(false)}
           style={{
             position: "fixed",
-            bottom: "84px",
-            right: "24px",
-            width: "360px",
-            maxHeight: "520px",
-            height: "100%",
-            background: "var(--paper)",
-            border: "1px solid var(--line)",
-            borderRadius: "16px",
-            boxShadow: "0 12px 32px rgba(0,0,0,0.2)",
-            display: "flex",
-            flexDirection: "column",
+            inset: 0,
+            background: "rgba(28, 27, 25, 0.4)",
             zIndex: 100,
-            overflow: "hidden",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "16px",
           }}
         >
+          <div
+            className="ai-chat-card"
+            style={{
+              width: "100%",
+              maxWidth: "420px",
+              height: "100%",
+              maxHeight: "560px",
+              background: "var(--paper)",
+              border: "1px solid var(--line)",
+              borderRadius: "18px",
+              boxShadow: "0 16px 40px rgba(0,0,0,0.2)",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+          >
           {/* Header */}
           <div
             style={{
@@ -412,6 +420,7 @@ export default function AdminAiChatbot({ existingCategories }: AdminAiChatbotPro
             </button>
           </div>
         </div>
+      </div>
       )}
     </>
   );
