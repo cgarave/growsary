@@ -2,7 +2,15 @@
 
 import React, { useState } from "react";
 import { Search, Camera, ShoppingBag, Plus, Trash2, History } from "lucide-react";
-import { CatalogCategory, CatalogProduct, VariantPrice } from "./actions";
+import {
+  CatalogCategory,
+  CatalogProduct,
+  VariantPrice,
+  createProductAction,
+  updateProductAction,
+  deleteProductAction,
+  toggleProductStockAction,
+} from "./actions";
 import { authClient } from "@/lib/auth-client";
 import { toast, Toaster } from "sonner";
 import BarcodeScannerModal from "@/components/BarcodeScannerModal";
@@ -143,7 +151,7 @@ export default function CatalogView({
     setEditVariants((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleUpdateProduct = (e: React.FormEvent) => {
+  const handleUpdateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editTarget) return;
 
@@ -155,31 +163,51 @@ export default function CatalogView({
       recentChange: true,
     }));
 
-    setProducts((prev) =>
-      prev.map((p) => {
-        if (p.id === editTarget.id) {
-          return {
-            ...p,
-            name: editProdName,
-            brand: editProdBrand || null,
-            barcode: editProdBarcode || null,
-            imageUrl: editProdImageUrl || null,
-            categoryName: editProdCategory,
-            variants: updatedVariants.map((v, idx) => ({
-              id: v.id || `v-${Date.now()}-${idx}`,
-              label: v.label,
-              retailPrice: v.retailPrice,
-              wholesalePrice: v.wholesalePrice,
-              recentChange: true,
-            })),
-          };
-        }
-        return p;
-      })
-    );
+    try {
+      await updateProductAction({
+        id: editTarget.id,
+        name: editProdName,
+        brand: editProdBrand || undefined,
+        barcode: editProdBarcode || undefined,
+        imageUrl: editProdImageUrl || undefined,
+        categoryName: editProdCategory,
+        variants: updatedVariants.map((v) => ({
+          id: v.id,
+          label: v.label,
+          retailPrice: v.retailPrice,
+          wholesalePrice: v.wholesalePrice,
+        })),
+      });
 
-    setEditTarget(null);
-    toast.success(`Updated ${editProdName}`);
+      setProducts((prev) =>
+        prev.map((p) => {
+          if (p.id === editTarget.id) {
+            return {
+              ...p,
+              name: editProdName,
+              brand: editProdBrand || null,
+              barcode: editProdBarcode || null,
+              imageUrl: editProdImageUrl || null,
+              categoryName: editProdCategory,
+              variants: updatedVariants.map((v, idx) => ({
+                id: v.id || `v-${Date.now()}-${idx}`,
+                label: v.label,
+                retailPrice: v.retailPrice,
+                wholesalePrice: v.wholesalePrice,
+                recentChange: true,
+              })),
+            };
+          }
+          return p;
+        })
+      );
+
+      setEditTarget(null);
+      toast.success(`Updated ${editProdName}`);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update product in database");
+    }
   };
 
   const handleAdminLogin = async (e: React.FormEvent) => {
@@ -250,11 +278,11 @@ export default function CatalogView({
       if (qty <= 0) return;
 
       const unitPrice = priceMode === "retail" ? v.retailPrice : v.wholesalePrice;
-      const key = `${selectedProductForVariant.id}-${v.id}-${priceMode}`;
+      const key = `${selectedProductForVariant.id}-${v.id}`;
+      const existingIdx = newCart.findIndex((item) => item.key === key);
 
-      const existingIndex = newCart.findIndex((item) => item.key === key);
-      if (existingIndex > -1) {
-        newCart[existingIndex].qty += qty;
+      if (existingIdx >= 0) {
+        newCart[existingIdx].qty += qty;
       } else {
         newCart.push({
           key,
@@ -270,20 +298,30 @@ export default function CatalogView({
       addedCount += qty;
     });
 
-    setCart(newCart);
-    setSelectedProductForVariant(null);
-    toast.success(`Added ${addedCount} item(s) to cart`);
+    if (addedCount > 0) {
+      setCart(newCart);
+      toast.success(`Added ${addedCount} item(s) to cart`);
+      setSelectedProductForVariant(null);
+    } else {
+      toast.info("Please select a quantity first");
+    }
   };
 
   const updateCartQty = (key: string, delta: number) => {
     setCart((prev) =>
       prev
-        .map((item) => (item.key === key ? { ...item, qty: item.qty + delta } : item))
-        .filter((item) => item.qty > 0)
+        .map((item) => {
+          if (item.key === key) {
+            const newQty = item.qty + delta;
+            return newQty > 0 ? { ...item, qty: newQty } : null;
+          }
+          return item;
+        })
+        .filter(Boolean) as CartItem[]
     );
   };
 
-  const removeCartItem = (key: string) => {
+  const removeCartLine = (key: string) => {
     setCart((prev) => prev.filter((item) => item.key !== key));
   };
 
@@ -308,13 +346,19 @@ export default function CatalogView({
   };
 
   const toggleStock = async (product: CatalogProduct) => {
-    setProducts((prev) =>
-      prev.map((p) => (p.id === product.id ? { ...p, isOutOfStock: !p.isOutOfStock } : p))
-    );
-    toast.info(`${product.name} marked as ${!product.isOutOfStock ? "Unavailable" : "In Stock"}`);
+    try {
+      await toggleProductStockAction(product.id, product.isOutOfStock);
+      setProducts((prev) =>
+        prev.map((p) => (p.id === product.id ? { ...p, isOutOfStock: !p.isOutOfStock } : p))
+      );
+      toast.info(`${product.name} marked as ${!product.isOutOfStock ? "Unavailable" : "In Stock"}`);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update stock status in database");
+    }
   };
 
-  const handleCreateProduct = (e: React.FormEvent) => {
+  const handleCreateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const targetCategory =
@@ -322,54 +366,77 @@ export default function CatalogView({
         ? customCategoryName.trim()
         : newProdCategory;
 
-    // Dynamically register new category chip if custom category was created
-    if (isAddingCustomCategory && customCategoryName.trim()) {
-      if (!categories.some((c) => c.name.toLowerCase() === targetCategory.toLowerCase())) {
-        setCategories((prev) => [
-          ...prev,
-          { id: `cat-${Date.now()}`, name: targetCategory, productCount: 1 },
-        ]);
-      }
-    }
+    try {
+      const created = await createProductAction({
+        name: newProdName,
+        brand: newProdBrand || undefined,
+        barcode: newProdBarcode || undefined,
+        imageUrl: newProdImageUrl || undefined,
+        categoryName: targetCategory,
+        variantLabel: newProdVariantLabel || "Standard",
+        retailPrice: Number(newProdRetail) || 0,
+        wholesalePrice: Number(newProdWholesale) || 0,
+      });
 
-    const newProd: CatalogProduct = {
-      id: `p-${Date.now()}`,
-      name: newProdName,
-      brand: newProdBrand || null,
-      barcode: newProdBarcode || null,
-      imageUrl: newProdImageUrl || null,
-      isOutOfStock: false,
-      categoryId: `cat-${targetCategory}`,
-      categoryName: targetCategory,
-      hasRecentPriceChange: true,
-      variants: [
-        {
-          id: `v-${Date.now()}`,
-          label: newProdVariantLabel || "Standard",
-          retailPrice: Number(newProdRetail) || 0,
-          wholesalePrice: Number(newProdWholesale) || 0,
-          recentChange: true,
-        },
-      ],
-    };
-    setProducts((prev) => [newProd, ...prev]);
-    setIsAddProductOpen(false);
-    toast.success(`Added ${newProdName} to ${targetCategory}`);
-    setNewProdName("");
-    setNewProdBrand("");
-    setNewProdBarcode("");
-    setNewProdImageUrl("");
-    setNewProdRetail("");
-    setNewProdWholesale("");
-    setIsAddingCustomCategory(false);
-    setCustomCategoryName("");
+      // Dynamically register new category chip if custom category was created
+      if (isAddingCustomCategory && customCategoryName.trim()) {
+        if (!categories.some((c) => c.name.toLowerCase() === targetCategory.toLowerCase())) {
+          setCategories((prev) => [
+            ...prev,
+            { id: `cat-${Date.now()}`, name: targetCategory, productCount: 1 },
+          ]);
+        }
+      }
+
+      const newProd: CatalogProduct = {
+        id: created.id,
+        name: newProdName,
+        brand: newProdBrand || null,
+        barcode: newProdBarcode || null,
+        imageUrl: newProdImageUrl || null,
+        isOutOfStock: false,
+        categoryId: created.categoryId,
+        categoryName: targetCategory,
+        hasRecentPriceChange: true,
+        variants: [
+          {
+            id: `v-${Date.now()}`,
+            label: newProdVariantLabel || "Standard",
+            retailPrice: Number(newProdRetail) || 0,
+            wholesalePrice: Number(newProdWholesale) || 0,
+            recentChange: true,
+          },
+        ],
+      };
+
+      setProducts((prev) => [newProd, ...prev]);
+      setIsAddProductOpen(false);
+      toast.success(`Added ${newProdName} to ${targetCategory}`);
+      setNewProdName("");
+      setNewProdBrand("");
+      setNewProdBarcode("");
+      setNewProdImageUrl("");
+      setNewProdRetail("");
+      setNewProdWholesale("");
+      setIsAddingCustomCategory(false);
+      setCustomCategoryName("");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save new product to database");
+    }
   };
 
-  const handleDeleteProduct = () => {
+  const handleDeleteProduct = async () => {
     if (!deleteTarget) return;
-    setProducts((prev) => prev.filter((p) => p.id !== deleteTarget.id));
-    toast.error(`Deleted ${deleteTarget.name}`);
-    setDeleteTarget(null);
+    try {
+      await deleteProductAction(deleteTarget.id);
+      setProducts((prev) => prev.filter((p) => p.id !== deleteTarget.id));
+      toast.error(`Deleted ${deleteTarget.name}`);
+      setDeleteTarget(null);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to delete product from database");
+    }
   };
 
   // Filter products by category and search term
@@ -1103,7 +1170,7 @@ export default function CatalogView({
                   <button
                     className="cart-del"
                     title="Remove"
-                    onClick={() => removeCartItem(item.key)}
+                    onClick={() => removeCartLine(item.key)}
                   >
                     <Trash2 width="12" height="12" />
                   </button>
