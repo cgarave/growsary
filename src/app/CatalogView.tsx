@@ -151,9 +151,9 @@ export default function CatalogView({
   const [customCategoryName, setCustomCategoryName] = useState("");
   const [newProdBarcode, setNewProdBarcode] = useState("");
   const [newProdImageUrl, setNewProdImageUrl] = useState("");
-  const [newProdVariantLabel, setNewProdVariantLabel] = useState("Standard");
-  const [newProdRetail, setNewProdRetail] = useState("");
-  const [newProdWholesale, setNewProdWholesale] = useState("");
+  const [newProdVariants, setNewProdVariants] = useState<
+    Array<{ label: string; retailPrice: string; wholesalePrice: string }>
+  >([{ label: "Standard", retailPrice: "", wholesalePrice: "" }]);
 
   const [deleteTarget, setDeleteTarget] = useState<CatalogProduct | null>(null);
   const [deleteCategoryTarget, setDeleteCategoryTarget] = useState<CatalogCategory | null>(null);
@@ -184,6 +184,17 @@ export default function CatalogView({
         wholesalePrice: v.wholesalePrice.toString(),
       }))
     );
+  };
+
+  const handleAddVariantInCreate = () => {
+    setNewProdVariants((prev) => [
+      ...prev,
+      { label: "", retailPrice: "", wholesalePrice: "" },
+    ]);
+  };
+
+  const handleRemoveVariantInCreate = (index: number) => {
+    setNewProdVariants((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleAddVariantInEdit = () => {
@@ -483,9 +494,14 @@ export default function CatalogView({
     const brand = newProdBrand;
     const barcode = newProdBarcode;
     const imageUrl = newProdImageUrl;
-    const variantLabel = newProdVariantLabel || "Standard";
-    const retailPrice = Number(newProdRetail) || 0;
-    const wholesalePrice = Number(newProdWholesale) || 0;
+
+    const preparedVariants = newProdVariants.map((v, idx) => ({
+      id: `v-temp-${Date.now()}-${idx}`,
+      label: v.label || "Standard",
+      retailPrice: Number(v.retailPrice) || 0,
+      wholesalePrice: Number(v.wholesalePrice) || 0,
+      recentChange: true,
+    }));
 
     // 1. INSTANT OPTIMISTIC CLIENT UPDATE (Closes modal immediately)
     if (isAddingCustomCategory && customCategoryName.trim()) {
@@ -507,15 +523,7 @@ export default function CatalogView({
       categoryId: `cat-${targetCategory}`,
       categoryName: targetCategory,
       hasRecentPriceChange: true,
-      variants: [
-        {
-          id: `v-temp-${Date.now()}`,
-          label: variantLabel,
-          retailPrice,
-          wholesalePrice,
-          recentChange: true,
-        },
-      ],
+      variants: preparedVariants,
     };
 
     setProducts((prev) => [newProd, ...prev]);
@@ -527,8 +535,7 @@ export default function CatalogView({
     setNewProdBrand("");
     setNewProdBarcode("");
     setNewProdImageUrl("");
-    setNewProdRetail("");
-    setNewProdWholesale("");
+    setNewProdVariants([{ label: "Standard", retailPrice: "", wholesalePrice: "" }]);
     setIsAddingCustomCategory(false);
     setCustomCategoryName("");
 
@@ -539,9 +546,11 @@ export default function CatalogView({
       barcode: barcode || undefined,
       imageUrl: imageUrl || undefined,
       categoryName: targetCategory,
-      variantLabel,
-      retailPrice,
-      wholesalePrice,
+      variants: preparedVariants.map((v) => ({
+        label: v.label,
+        retailPrice: v.retailPrice,
+        wholesalePrice: v.wholesalePrice,
+      })),
     })
       .then((created) => {
         // Update temporary ID with real DB ID
@@ -1254,39 +1263,111 @@ export default function CatalogView({
                 </div>
               </div>
 
+              {/* Multi-Variant Section */}
               <div className="field">
-                <label>Initial Variant Label</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. 1.5L Bottle"
-                  value={newProdVariantLabel}
-                  onChange={(e) => setNewProdVariantLabel(e.target.value)}
-                />
-              </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                  <label style={{ margin: 0 }}>Product Variants & Pricing</label>
+                  <button
+                    type="button"
+                    onClick={handleAddVariantInCreate}
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      color: "var(--teal)",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      padding: 0,
+                    }}
+                  >
+                    + Add variant
+                  </button>
+                </div>
 
-              <div className="field">
-                <label>Retail Price (₱)</label>
-                <input
-                  type="number"
-                  required
-                  step="0.01"
-                  placeholder="78.00"
-                  value={newProdRetail}
-                  onChange={(e) => setNewProdRetail(e.target.value)}
-                />
-              </div>
-
-              <div className="field">
-                <label>Wholesale Price (₱)</label>
-                <input
-                  type="number"
-                  required
-                  step="0.01"
-                  placeholder="65.00"
-                  value={newProdWholesale}
-                  onChange={(e) => setNewProdWholesale(e.target.value)}
-                />
+                {newProdVariants.map((v, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      background: "var(--paper)",
+                      border: "1px solid var(--line)",
+                      borderRadius: "9px",
+                      padding: "10px",
+                      marginBottom: "8px",
+                    }}
+                  >
+                    <div style={{ display: "flex", gap: "8px", marginBottom: "6px", alignItems: "center" }}>
+                      <input
+                        type="text"
+                        placeholder="Variant label (e.g. 1.5L Bottle, 250g)"
+                        required
+                        value={v.label}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setNewProdVariants((prev) =>
+                            prev.map((item, idx) => (idx === i ? { ...item, label: val } : item))
+                          );
+                        }}
+                        style={{ flex: 1 }}
+                      />
+                      {newProdVariants.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveVariantInCreate(i)}
+                          style={{
+                            background: "var(--red-soft)",
+                            color: "var(--red)",
+                            border: "1px solid var(--red-soft)",
+                            borderRadius: "6px",
+                            padding: "6px 8px",
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            cursor: "pointer",
+                          }}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: "10px", color: "var(--muted)", marginBottom: "2px" }}>
+                          Retail (₱)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          required
+                          placeholder="0.00"
+                          value={v.retailPrice}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setNewProdVariants((prev) =>
+                              prev.map((item, idx) => (idx === i ? { ...item, retailPrice: val } : item))
+                            );
+                          }}
+                        />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: "10px", color: "var(--muted)", marginBottom: "2px" }}>
+                          Wholesale (₱)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          required
+                          placeholder="0.00"
+                          value={v.wholesalePrice}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setNewProdVariants((prev) =>
+                              prev.map((item, idx) => (idx === i ? { ...item, wholesalePrice: val } : item))
+                            );
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
 
               <div className="modal-actions">

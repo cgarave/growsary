@@ -167,9 +167,14 @@ export async function createProductAction(data: {
   barcode?: string;
   imageUrl?: string;
   categoryName: string;
-  variantLabel: string;
-  retailPrice: number;
-  wholesalePrice: number;
+  variantLabel?: string;
+  retailPrice?: number;
+  wholesalePrice?: number;
+  variants?: Array<{
+    label: string;
+    retailPrice: number;
+    wholesalePrice: number;
+  }>;
 }) {
   let category = await prisma.category.findUnique({
     where: { name: data.categoryName },
@@ -181,6 +186,17 @@ export async function createProductAction(data: {
     });
   }
 
+  const variantsList =
+    data.variants && data.variants.length > 0
+      ? data.variants
+      : [
+          {
+            label: data.variantLabel || "Standard",
+            retailPrice: data.retailPrice || 0,
+            wholesalePrice: data.wholesalePrice || 0,
+          },
+        ];
+
   const product = await prisma.product.create({
     data: {
       name: data.name,
@@ -189,15 +205,15 @@ export async function createProductAction(data: {
       imageUrl: data.imageUrl || null,
       categoryId: category.id,
       variants: {
-        create: {
-          label: data.variantLabel,
+        create: variantsList.map((v) => ({
+          label: v.label || "Standard",
           prices: {
             create: [
-              { type: "RETAIL", amount: data.retailPrice },
-              { type: "WHOLESALE", amount: data.wholesalePrice },
+              { type: "RETAIL", amount: v.retailPrice },
+              { type: "WHOLESALE", amount: v.wholesalePrice },
             ],
           },
-        },
+        })),
       },
     },
   });
