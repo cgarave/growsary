@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
-import { Search, Camera, ShoppingBag, Plus, Trash2, History, X } from "lucide-react";
+import React, { useState, useRef } from "react";
+import { Search, Camera, ShoppingBag, Plus, Trash2, History, X, Download, RotateCcw } from "lucide-react";
+import { toPng } from "html-to-image";
 import {
   CatalogCategory,
   CatalogProduct,
@@ -93,6 +94,35 @@ export default function CatalogView({
   // Cart & Modals state
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const cartRef = useRef<HTMLDivElement>(null);
+
+  // Load saved cart from localStorage on mount
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const savedCart = localStorage.getItem("growsary_customer_cart");
+        if (savedCart) {
+          const parsed = JSON.parse(savedCart);
+          if (Array.isArray(parsed)) {
+            setCart(parsed);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load cart from localStorage", e);
+      }
+    }
+  }, []);
+
+  // Save cart to localStorage on changes
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("growsary_customer_cart", JSON.stringify(cart));
+      } catch (e) {
+        console.error("Failed to save cart to localStorage", e);
+      }
+    }
+  }, [cart]);
 
   // Variant Modal
   const [selectedProductForVariant, setSelectedProductForVariant] = useState<CatalogProduct | null>(null);
@@ -397,9 +427,30 @@ export default function CatalogView({
     const messengerUrl = `https://m.me/YourStorePage?text=${encodedMsg}`;
     window.open(messengerUrl, "_blank");
 
-    toast.success("Order pre-filled in Messenger — cart cleared!");
+    toast.success("Order pre-filled in Messenger! Cart retained.");
+  };
+
+  const handleClearCart = () => {
     setCart([]);
-    setIsCartOpen(false);
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("growsary_customer_cart");
+    }
+    toast.info("Cart has been reset.");
+  };
+
+  const handleExportCartImage = async () => {
+    if (!cartRef.current) return;
+    try {
+      const dataUrl = await toPng(cartRef.current, { cacheBust: true, backgroundColor: "#ffffff" });
+      const link = document.createElement("a");
+      link.download = `Growsary-Cart-${Date.now()}.png`;
+      link.href = dataUrl;
+      link.click();
+      toast.success("Cart saved as image!");
+    } catch (err) {
+      console.error("Failed to export cart image", err);
+      toast.error("Failed to export cart image.");
+    }
   };
 
   const toggleStock = (product: CatalogProduct) => {
@@ -1336,56 +1387,116 @@ export default function CatalogView({
       {/* Cart Modal */}
       {isCartOpen && (
         <div className="overlay cart-modal" onClick={(e) => e.target === e.currentTarget && setIsCartOpen(false)}>
-          <div className="modal">
-            <h3>My Cart</h3>
-            <div className="sub">Review your items, then send your order to us on Messenger.</div>
-
-            {cart.length === 0 ? (
-              <div className="cart-empty">
-                Your cart is empty — tap the + next to any item to add it.
+          <div className="modal" style={{ maxWidth: "480px", width: "100%" }}>
+            <div ref={cartRef} style={{ background: "var(--paper)", padding: "16px", borderRadius: "12px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                <h3 style={{ margin: 0 }}>My Cart</h3>
+                {cart.length > 0 && (
+                  <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--muted)", fontFamily: "monospace" }}>
+                    {totalCartCount} item(s)
+                  </span>
+                )}
               </div>
-            ) : (
-              cart.map((item) => (
-                <div key={item.key} className="cart-line">
-                  <div className="cl-info">
-                    <div className="cl-name">{item.name}</div>
-                    <div className="cl-variant">
-                      {item.variantLabel} · ₱{item.unitPrice.toFixed(2)} each
-                    </div>
-                  </div>
+              <div className="sub" style={{ marginBottom: "16px" }}>
+                Review your items, then send your order to us on Messenger or save your cart image.
+              </div>
 
-                  <div className="qty-stepper">
-                    <button onClick={() => updateCartQty(item.key, -1)}>−</button>
-                    <span>{item.qty}</span>
-                    <button onClick={() => updateCartQty(item.key, 1)}>+</button>
-                  </div>
-
-                  <div className="cl-price mono">
-                    ₱{(item.unitPrice * item.qty).toFixed(2)}
-                  </div>
-
-                  <button
-                    className="cart-del"
-                    title="Remove"
-                    onClick={() => removeCartLine(item.key)}
-                  >
-                    <Trash2 width="12" height="12" />
-                  </button>
+              {cart.length === 0 ? (
+                <div className="cart-empty">
+                  Your cart is empty — tap the + next to any item to add it.
                 </div>
-              ))
-            )}
+              ) : (
+                cart.map((item) => (
+                  <div key={item.key} className="cart-line">
+                    <div className="cl-info">
+                      <div className="cl-name">{item.name}</div>
+                      <div className="cl-variant">
+                        {item.variantLabel} · ₱{item.unitPrice.toFixed(2)} each
+                      </div>
+                    </div>
 
-            {cart.length > 0 && (
-              <>
+                    <div className="qty-stepper">
+                      <button onClick={() => updateCartQty(item.key, -1)}>−</button>
+                      <span>{item.qty}</span>
+                      <button onClick={() => updateCartQty(item.key, 1)}>+</button>
+                    </div>
+
+                    <div className="cl-price mono">
+                      ₱{(item.unitPrice * item.qty).toFixed(2)}
+                    </div>
+
+                    <button
+                      className="cart-del"
+                      title="Remove"
+                      onClick={() => removeCartLine(item.key)}
+                    >
+                      <Trash2 width="12" height="12" />
+                    </button>
+                  </div>
+                ))
+              )}
+
+              {cart.length > 0 && (
                 <div className="cart-total-row">
                   <span>Total</span>
                   <span className="amt">₱{totalCartAmount.toFixed(2)}</span>
                 </div>
-                <button className="place-order-btn" onClick={handlePlaceOrder}>
+              )}
+            </div>
+
+            {cart.length > 0 && (
+              <>
+                <button className="place-order-btn" onClick={handlePlaceOrder} style={{ marginBottom: "8px" }}>
                   Place order via Messenger
                 </button>
+                <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+                  <button
+                    type="button"
+                    onClick={handleExportCartImage}
+                    style={{
+                      flex: 1,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "6px",
+                      background: "var(--teal-soft)",
+                      color: "var(--teal)",
+                      border: "1px solid var(--teal-soft)",
+                      borderRadius: "9px",
+                      padding: "9px",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <Download width="14" height="14" />
+                    Save as Image
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleClearCart}
+                    style={{
+                      flex: 1,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "6px",
+                      background: "var(--red-soft)",
+                      color: "var(--red)",
+                      border: "1px solid var(--red-soft)",
+                      borderRadius: "9px",
+                      padding: "9px",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <RotateCcw width="14" height="14" />
+                    Reset Cart
+                  </button>
+                </div>
                 <div className="cart-note">
-                  This opens Messenger with your order pre-filled. Just hit send there to confirm with us.
+                  Cart is saved automatically to your device. You can reset it anytime using the Reset Cart button above.
                 </div>
               </>
             )}
