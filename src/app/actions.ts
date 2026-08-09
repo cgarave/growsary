@@ -137,6 +137,7 @@ export async function createProductAction(data: {
   name: string;
   brand?: string;
   barcode?: string;
+  imageUrl?: string;
   categoryName: string;
   variantLabel: string;
   retailPrice: number;
@@ -157,6 +158,7 @@ export async function createProductAction(data: {
       name: data.name,
       brand: data.brand || null,
       barcode: data.barcode || null,
+      imageUrl: data.imageUrl || null,
       categoryId: category.id,
       variants: {
         create: {
@@ -182,6 +184,7 @@ export async function updateProductAction(data: {
   name: string;
   brand?: string;
   barcode?: string;
+  imageUrl?: string;
   categoryName: string;
   variants: Array<{
     id?: string;
@@ -206,6 +209,7 @@ export async function updateProductAction(data: {
       name: data.name,
       brand: data.brand || null,
       barcode: data.barcode || null,
+      imageUrl: data.imageUrl || null,
       categoryId: category.id,
     },
   });

@@ -41,7 +41,7 @@ export default function CatalogView({
   const isAdmin = !!session?.user || isAdminState;
 
   const [products, setProducts] = useState<CatalogProduct[]>(initialProducts);
-  const [categories] = useState<CatalogCategory[]>(initialCategories);
+  const [categories, setCategories] = useState<CatalogCategory[]>(initialCategories);
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [priceMode, setPriceMode] = useState<"retail" | "wholesale">("retail");
@@ -94,7 +94,10 @@ export default function CatalogView({
   const [newProdName, setNewProdName] = useState("");
   const [newProdBrand, setNewProdBrand] = useState("");
   const [newProdCategory, setNewProdCategory] = useState("Softdrinks");
+  const [isAddingCustomCategory, setIsAddingCustomCategory] = useState(false);
+  const [customCategoryName, setCustomCategoryName] = useState("");
   const [newProdBarcode, setNewProdBarcode] = useState("");
+  const [newProdImageUrl, setNewProdImageUrl] = useState("");
   const [newProdVariantLabel, setNewProdVariantLabel] = useState("Standard");
   const [newProdRetail, setNewProdRetail] = useState("");
   const [newProdWholesale, setNewProdWholesale] = useState("");
@@ -107,6 +110,7 @@ export default function CatalogView({
   const [editProdBrand, setEditProdBrand] = useState("");
   const [editProdCategory, setEditProdCategory] = useState("Softdrinks");
   const [editProdBarcode, setEditProdBarcode] = useState("");
+  const [editProdImageUrl, setEditProdImageUrl] = useState("");
   const [editVariants, setEditVariants] = useState<
     Array<{ id?: string; label: string; retailPrice: string; wholesalePrice: string }>
   >([]);
@@ -117,6 +121,7 @@ export default function CatalogView({
     setEditProdBrand(product.brand || "");
     setEditProdCategory(product.categoryName);
     setEditProdBarcode(product.barcode || "");
+    setEditProdImageUrl(product.imageUrl || "");
     setEditVariants(
       product.variants.map((v) => ({
         id: v.id,
@@ -158,6 +163,7 @@ export default function CatalogView({
             name: editProdName,
             brand: editProdBrand || null,
             barcode: editProdBarcode || null,
+            imageUrl: editProdImageUrl || null,
             categoryName: editProdCategory,
             variants: updatedVariants.map((v, idx) => ({
               id: v.id || `v-${Date.now()}-${idx}`,
@@ -310,15 +316,31 @@ export default function CatalogView({
 
   const handleCreateProduct = (e: React.FormEvent) => {
     e.preventDefault();
+
+    const targetCategory =
+      isAddingCustomCategory && customCategoryName.trim()
+        ? customCategoryName.trim()
+        : newProdCategory;
+
+    // Dynamically register new category chip if custom category was created
+    if (isAddingCustomCategory && customCategoryName.trim()) {
+      if (!categories.some((c) => c.name.toLowerCase() === targetCategory.toLowerCase())) {
+        setCategories((prev) => [
+          ...prev,
+          { id: `cat-${Date.now()}`, name: targetCategory, productCount: 1 },
+        ]);
+      }
+    }
+
     const newProd: CatalogProduct = {
       id: `p-${Date.now()}`,
       name: newProdName,
       brand: newProdBrand || null,
       barcode: newProdBarcode || null,
-      imageUrl: null,
+      imageUrl: newProdImageUrl || null,
       isOutOfStock: false,
-      categoryId: `cat-${newProdCategory}`,
-      categoryName: newProdCategory,
+      categoryId: `cat-${targetCategory}`,
+      categoryName: targetCategory,
       hasRecentPriceChange: true,
       variants: [
         {
@@ -332,12 +354,15 @@ export default function CatalogView({
     };
     setProducts((prev) => [newProd, ...prev]);
     setIsAddProductOpen(false);
-    toast.success(`Added ${newProdName} to catalog`);
+    toast.success(`Added ${newProdName} to ${targetCategory}`);
     setNewProdName("");
     setNewProdBrand("");
     setNewProdBarcode("");
+    setNewProdImageUrl("");
     setNewProdRetail("");
     setNewProdWholesale("");
+    setIsAddingCustomCategory(false);
+    setCustomCategoryName("");
   };
 
   const handleDeleteProduct = () => {
@@ -472,7 +497,15 @@ export default function CatalogView({
                     className={`card ${p.isOutOfStock ? "out-of-stock" : ""}`}
                   >
                     <div className="thumb">
-                      {CATEGORY_EMOJIS[catName] || "🥤"}
+                      {p.imageUrl ? (
+                        <img
+                          src={p.imageUrl}
+                          alt={p.name}
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        />
+                      ) : (
+                        CATEGORY_EMOJIS[catName] || "🥤"
+                      )}
                       {p.isOutOfStock && <div className="oos-badge">Unavailable</div>}
                       {!p.isOutOfStock && p.hasRecentPriceChange && (
                         <div className="change-badge">↑ new</div>
@@ -643,12 +676,23 @@ export default function CatalogView({
                   value={editProdCategory}
                   onChange={(e) => setEditProdCategory(e.target.value)}
                 >
-                  <option value="Softdrinks">Softdrinks</option>
-                  <option value="Snacks">Snacks</option>
-                  <option value="Biscuits">Biscuits</option>
-                  <option value="Canned Goods">Canned Goods</option>
-                  <option value="Instant Noodles">Instant Noodles</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.name}>
+                      {c.name}
+                    </option>
+                  ))}
                 </select>
+              </div>
+              <div className="field">
+                <label>
+                  Image URL <span className="optional-tag">— optional image link</span>
+                </label>
+                <input
+                  type="url"
+                  placeholder="e.g. https://images.unsplash.com/photo-..."
+                  value={editProdImageUrl}
+                  onChange={(e) => setEditProdImageUrl(e.target.value)}
+                />
               </div>
               <div className="field">
                 <label>
@@ -820,17 +864,55 @@ export default function CatalogView({
                 />
               </div>
               <div className="field">
-                <label>Category</label>
-                <select
-                  value={newProdCategory}
-                  onChange={(e) => setNewProdCategory(e.target.value)}
-                >
-                  <option value="Softdrinks">Softdrinks</option>
-                  <option value="Snacks">Snacks</option>
-                  <option value="Biscuits">Biscuits</option>
-                  <option value="Canned Goods">Canned Goods</option>
-                  <option value="Instant Noodles">Instant Noodles</option>
-                </select>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                  <label style={{ margin: 0 }}>Category</label>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingCustomCategory((prev) => !prev)}
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      color: "var(--teal)",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      padding: 0,
+                    }}
+                  >
+                    {isAddingCustomCategory ? "← Select existing category" : "+ Add new category"}
+                  </button>
+                </div>
+                {isAddingCustomCategory ? (
+                  <input
+                    type="text"
+                    required
+                    placeholder="Enter new category name (e.g. Frozen Foods)"
+                    value={customCategoryName}
+                    onChange={(e) => setCustomCategoryName(e.target.value)}
+                  />
+                ) : (
+                  <select
+                    value={newProdCategory}
+                    onChange={(e) => setNewProdCategory(e.target.value)}
+                  >
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.name}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              <div className="field">
+                <label>
+                  Image URL <span className="optional-tag">— optional image link</span>
+                </label>
+                <input
+                  type="url"
+                  placeholder="e.g. https://images.unsplash.com/photo-..."
+                  value={newProdImageUrl}
+                  onChange={(e) => setNewProdImageUrl(e.target.value)}
+                />
               </div>
               <div className="field">
                 <label>
