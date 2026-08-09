@@ -50,9 +50,10 @@ export default function PriceHistoryModal({
 
   if (!isOpen) return null;
 
+  const profitAmt = currentRetail - currentWholesale;
   const marginPct =
     currentWholesale > 0
-      ? (((currentRetail - currentWholesale) / currentWholesale) * 100).toFixed(1)
+      ? ((profitAmt / currentWholesale) * 100).toFixed(1)
       : "0";
 
   return (
@@ -62,7 +63,7 @@ export default function PriceHistoryModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="modal" style={{ maxWidth: "440px" }}>
+      <div className="modal" style={{ maxWidth: "460px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -87,14 +88,14 @@ export default function PriceHistoryModal({
           </button>
         </div>
 
-        {/* Current Margin Summary Box (Admin Only) */}
+        {/* Current Margin & Profit Summary Box (Admin Only) */}
         {isAdmin && (
           <div
             style={{
               background: "var(--teal-soft)",
               border: "1px solid var(--teal)",
-              borderRadius: "10px",
-              padding: "12px 14px",
+              borderRadius: "12px",
+              padding: "14px 16px",
               marginBottom: "16px",
               display: "flex",
               justifyContent: "space-between",
@@ -102,66 +103,86 @@ export default function PriceHistoryModal({
             }}
           >
             <div>
-              <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--teal)", textTransform: "uppercase" }}>
-                Current Profit Margin
+              <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--teal)", textTransform: "uppercase", letterSpacing: "0.02em" }}>
+                Current Profit & Margin
               </div>
-              <div style={{ fontSize: "13px", fontWeight: 600, marginTop: "2px" }}>
+              <div style={{ fontSize: "12.5px", fontWeight: 600, marginTop: "3px" }}>
                 Retail: ₱{currentRetail.toFixed(2)} | Wholesale: ₱{currentWholesale.toFixed(2)}
               </div>
             </div>
-            <div style={{ fontSize: "18px", fontWeight: 800, color: "var(--teal)", fontFamily: "'IBM Plex Mono', monospace" }}>
-              +{marginPct}%
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontSize: "16px", fontWeight: 800, color: "var(--teal)", fontFamily: "'IBM Plex Mono', monospace" }}>
+                +₱{profitAmt.toFixed(2)}
+              </div>
+              <div style={{ fontSize: "11.5px", fontWeight: 700, color: "var(--teal)", opacity: 0.9 }}>
+                ({marginPct}% margin)
+              </div>
             </div>
           </div>
         )}
 
-        {/* Timeline Log */}
+        {/* Timeline Log in Variant Cards */}
         {loading ? (
           <div className="text-center py-8 text-xs text-[var(--muted)]">Loading price logs…</div>
         ) : history.length === 0 ? (
           <div className="text-center py-8 text-xs text-[var(--muted)]">No price log history recorded yet.</div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxHeight: "50vh", overflowY: "auto" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px", maxHeight: "50vh", overflowY: "auto" }}>
             {history.map((item, idx) => {
               const prevItem = history[idx + 1];
               const isIncrease = prevItem ? item.amount > prevItem.amount : false;
               const isDecrease = prevItem ? item.amount < prevItem.amount : false;
+              const diff = prevItem ? item.amount - prevItem.amount : 0;
 
               return (
                 <div
                   key={item.id}
                   style={{
-                    background: "var(--paper)",
+                    background: "var(--card)",
                     border: "1px solid var(--line)",
-                    borderRadius: "9px",
-                    padding: "10px 12px",
+                    borderRadius: "12px",
+                    padding: "12px 14px",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                     <div
                       style={{
-                        width: "28px",
-                        height: "28px",
-                        borderRadius: "50%",
+                        width: "34px",
+                        height: "34px",
+                        borderRadius: "10px",
                         background: item.type === "RETAIL" ? "var(--teal-soft)" : "var(--amber-soft)",
                         color: item.type === "RETAIL" ? "var(--teal)" : "var(--amber)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        fontSize: "12px",
-                        fontWeight: 700,
+                        fontSize: "13px",
+                        fontWeight: 800,
+                        flexShrink: 0,
                       }}
                     >
                       {item.type === "RETAIL" ? "R" : "W"}
                     </div>
                     <div>
-                      <div style={{ fontSize: "12.5px", fontWeight: 700 }}>
-                        {item.type} Price Logged
+                      <div style={{ fontSize: "13px", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span>{variantLabel}</span>
+                        <span
+                          style={{
+                            fontSize: "10px",
+                            fontWeight: 700,
+                            padding: "2px 6px",
+                            borderRadius: "4px",
+                            background: item.type === "RETAIL" ? "var(--teal-soft)" : "var(--amber-soft)",
+                            color: item.type === "RETAIL" ? "var(--teal)" : "var(--amber)",
+                          }}
+                        >
+                          {item.type}
+                        </span>
                       </div>
-                      <div style={{ fontSize: "11px", color: "var(--muted)" }}>
+                      <div style={{ fontSize: "11px", color: "var(--muted)", marginTop: "2px" }}>
                         {new Date(item.effectiveFrom).toLocaleDateString("en-US", {
                           month: "short",
                           day: "numeric",
@@ -177,7 +198,7 @@ export default function PriceHistoryModal({
                     <div
                       className="mono"
                       style={{
-                        fontSize: "14.5px",
+                        fontSize: "15px",
                         fontWeight: 800,
                         color: item.type === "RETAIL" ? "var(--teal)" : "var(--amber)",
                       }}
@@ -187,19 +208,19 @@ export default function PriceHistoryModal({
                     {prevItem && (
                       <div
                         style={{
-                          fontSize: "10.5px",
+                          fontSize: "11px",
                           fontWeight: 700,
                           color: isIncrease ? "var(--teal)" : isDecrease ? "var(--red)" : "var(--muted)",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "flex-end",
                           gap: "2px",
+                          marginTop: "2px",
                         }}
                       >
                         {isIncrease && <TrendingUp width="12" height="12" />}
                         {isDecrease && <TrendingDown width="12" height="12" />}
-                        {isIncrease ? "+" : ""}
-                        {(item.amount - prevItem.amount).toFixed(2)}
+                        {isIncrease ? "+" : ""}₱{diff.toFixed(2)}
                       </div>
                     )}
                   </div>
