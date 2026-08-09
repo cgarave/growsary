@@ -214,34 +214,64 @@ export async function updateProductAction(data: {
     },
   });
 
+  // Handle deleted variants (variants that existed in DB but were removed in edit form)
+  const existingVariants = await prisma.productVariant.findMany({
+    where: { productId: data.id },
+    select: { id: true },
+  });
+
+  const keepVariantIds = data.variants.map((v) => v.id).filter(Boolean) as string[];
+  const deleteVariantIds = existingVariants
+    .map((v) => v.id)
+    .filter((id) => !keepVariantIds.includes(id));
+
+  if (deleteVariantIds.length > 0) {
+    await prisma.productVariant.deleteMany({
+      where: { id: { in: deleteVariantIds } },
+    });
+  }
+
   for (const v of data.variants) {
-    if (v.id) {
+    if (v.id && !v.id.startsWith("v-temp-")) {
       await prisma.productVariant.update({
         where: { id: v.id },
         data: { label: v.label },
       });
 
-      // Append new price records for price log history if modified
-      await prisma.price.create({
-        data: {
-          variantId: v.id,
-          type: "RETAIL",
-          amount: v.retailPrice,
-        },
+      // Get latest prices to avoid inserting duplicate price history if unchanged
+      const latestPrices = await prisma.price.findMany({
+        where: { variantId: v.id },
+        orderBy: { effectiveFrom: "desc" },
+        take: 2,
       });
 
-      await prisma.price.create({
-        data: {
-          variantId: v.id,
-          type: "WHOLESALE",
-          amount: v.wholesalePrice,
-        },
-      });
+      const latestRetail = latestPrices.find((p) => p.type === "RETAIL");
+      const latestWholesale = latestPrices.find((p) => p.type === "WHOLESALE");
+
+      if (!latestRetail || Number(latestRetail.amount) !== v.retailPrice) {
+        await prisma.price.create({
+          data: {
+            variantId: v.id,
+            type: "RETAIL",
+            amount: v.retailPrice,
+          },
+        });
+      }
+
+      if (!latestWholesale || Number(latestWholesale.amount) !== v.wholesalePrice) {
+        await prisma.price.create({
+          data: {
+            variantId: v.id,
+            type: "WHOLESALE",
+            amount: v.wholesalePrice,
+          },
+        });
+      }
     } else {
       // New variant added during edit
       await prisma.productVariant.create({
         data: {
-          label: v.label,
+          label: v.label || "Standard",
           productId: data.id,
           prices: {
             create: [

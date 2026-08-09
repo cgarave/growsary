@@ -46,6 +46,16 @@ export default function CatalogView({
 }: CatalogViewProps) {
   const { data: session } = authClient.useSession();
   const [isAdminState, setIsAdminState] = useState(false);
+
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedAdmin = localStorage.getItem("growsary_admin_logged_in");
+      if (savedAdmin === "true") {
+        setIsAdminState(true);
+      }
+    }
+  }, []);
+
   const isAdmin = !!session?.user || isAdminState;
 
   const [products, setProducts] = useState<CatalogProduct[]>(initialProducts);
@@ -94,6 +104,8 @@ export default function CatalogView({
 
   // Admin Modals
   const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
+  const [adminName, setAdminName] = useState("");
   const [adminEmail, setAdminEmail] = useState("admin@store.com");
   const [adminPassword, setAdminPassword] = useState("admin123456");
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -210,32 +222,60 @@ export default function CatalogView({
     }
   };
 
-  const handleAdminLogin = async (e: React.FormEvent) => {
+  const handleAdminAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
     try {
-      const res = await authClient.signIn.email({
-        email: adminEmail,
-        password: adminPassword,
-      });
+      if (authMode === "signup") {
+        const res = await authClient.signUp.email({
+          email: adminEmail,
+          password: adminPassword,
+          name: adminName || "Store Admin",
+        });
 
-      if (res.error) {
-        // Enforce strict check against correct admin credentials
-        if (adminEmail === "admin@store.com" && adminPassword === "admin123456") {
-          setIsAdminState(true);
-          setIsLoginOpen(false);
-          toast.success("Logged in as Admin");
+        if (res.error) {
+          setLoginError(res.error.message || "Failed to create account");
           return;
         }
-        setLoginError(res.error.message || "Invalid email or password");
-      } else {
+
         setIsAdminState(true);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("growsary_admin_logged_in", "true");
+        }
         setIsLoginOpen(false);
-        toast.success("Logged in as Admin");
+        toast.success("Account created! Logged in as Admin");
+      } else {
+        const res = await authClient.signIn.email({
+          email: adminEmail,
+          password: adminPassword,
+        });
+
+        if (res.error) {
+          if (adminEmail === "admin@store.com" && adminPassword === "admin123456") {
+            setIsAdminState(true);
+            if (typeof window !== "undefined") {
+              localStorage.setItem("growsary_admin_logged_in", "true");
+            }
+            setIsLoginOpen(false);
+            toast.success("Logged in as Admin");
+            return;
+          }
+          setLoginError(res.error.message || "Invalid email or password");
+        } else {
+          setIsAdminState(true);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("growsary_admin_logged_in", "true");
+          }
+          setIsLoginOpen(false);
+          toast.success("Logged in as Admin");
+        }
       }
     } catch {
       if (adminEmail === "admin@store.com" && adminPassword === "admin123456") {
         setIsAdminState(true);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("growsary_admin_logged_in", "true");
+        }
         setIsLoginOpen(false);
         toast.success("Logged in as Admin");
       } else {
@@ -247,6 +287,9 @@ export default function CatalogView({
   const handleAdminLogout = async () => {
     await authClient.signOut();
     setIsAdminState(false);
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("growsary_admin_logged_in");
+    }
     toast.success("Logged out from Admin");
   };
 
@@ -674,14 +717,49 @@ export default function CatalogView({
         </button>
       )}
 
-      {/* Admin Login Modal */}
+      {/* Admin Login / Sign Up Modal */}
       {isLoginOpen && (
         <div className="overlay" onClick={(e) => e.target === e.currentTarget && setIsLoginOpen(false)}>
           <div className="modal">
-            <h3>Admin login</h3>
-            <div className="sub">Enter admin credentials to manage catalog & prices.</div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+              <h3 style={{ margin: 0 }}>{authMode === "login" ? "Admin login" : "Create Admin account"}</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMode((prev) => (prev === "login" ? "signup" : "login"));
+                  setLoginError(null);
+                }}
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  color: "var(--teal)",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
+                {authMode === "login" ? "Need an account? Sign up" : "Have an account? Log in"}
+              </button>
+            </div>
+            <div className="sub">
+              {authMode === "login"
+                ? "Enter admin credentials to manage catalog & prices."
+                : "Register a new admin account for store management."}
+            </div>
             {loginError && <div className="text-red-600 text-xs mb-2">{loginError}</div>}
-            <form onSubmit={handleAdminLogin}>
+            <form onSubmit={handleAdminAuth}>
+              {authMode === "signup" && (
+                <div className="field">
+                  <label>Full Name</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Store Owner"
+                    value={adminName}
+                    onChange={(e) => setAdminName(e.target.value)}
+                  />
+                </div>
+              )}
               <div className="field">
                 <label>Email</label>
                 <input
@@ -705,7 +783,7 @@ export default function CatalogView({
                   Cancel
                 </button>
                 <button type="submit" className="save">
-                  Log in
+                  {authMode === "login" ? "Log in" : "Sign up"}
                 </button>
               </div>
             </form>
