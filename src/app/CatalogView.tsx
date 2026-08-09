@@ -46,6 +46,7 @@ export default function CatalogView({
 }: CatalogViewProps) {
   const { data: session } = authClient.useSession();
   const [isAdminState, setIsAdminState] = useState(false);
+  const [isLoggedOut, setIsLoggedOut] = useState(false);
 
   React.useEffect(() => {
     if (typeof window !== "undefined") {
@@ -56,7 +57,7 @@ export default function CatalogView({
     }
   }, []);
 
-  const isAdmin = !!session?.user || isAdminState;
+  const isAdmin = !isLoggedOut && (!!session?.user || isAdminState);
 
   const [products, setProducts] = useState<CatalogProduct[]>(initialProducts);
   const [categories, setCategories] = useState<CatalogCategory[]>(initialCategories);
@@ -163,9 +164,16 @@ export default function CatalogView({
     setEditVariants((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleUpdateProduct = async (e: React.FormEvent) => {
+  const handleUpdateProduct = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editTarget) return;
+
+    const targetId = editTarget.id;
+    const name = editProdName;
+    const brand = editProdBrand;
+    const barcode = editProdBarcode;
+    const imageUrl = editProdImageUrl;
+    const categoryName = editProdCategory;
 
     const updatedVariants = editVariants.map((v) => ({
       id: v.id,
@@ -175,51 +183,51 @@ export default function CatalogView({
       recentChange: true,
     }));
 
-    try {
-      await updateProductAction({
-        id: editTarget.id,
-        name: editProdName,
-        brand: editProdBrand || undefined,
-        barcode: editProdBarcode || undefined,
-        imageUrl: editProdImageUrl || undefined,
-        categoryName: editProdCategory,
-        variants: updatedVariants.map((v) => ({
-          id: v.id,
-          label: v.label,
-          retailPrice: v.retailPrice,
-          wholesalePrice: v.wholesalePrice,
-        })),
-      });
+    // 1. INSTANT OPTIMISTIC CLIENT UPDATE (Closes modal immediately)
+    setProducts((prev) =>
+      prev.map((p) => {
+        if (p.id === targetId) {
+          return {
+            ...p,
+            name,
+            brand: brand || null,
+            barcode: barcode || null,
+            imageUrl: imageUrl || null,
+            categoryName,
+            variants: updatedVariants.map((v, idx) => ({
+              id: v.id || `v-temp-${Date.now()}-${idx}`,
+              label: v.label,
+              retailPrice: v.retailPrice,
+              wholesalePrice: v.wholesalePrice,
+              recentChange: true,
+            })),
+          };
+        }
+        return p;
+      })
+    );
 
-      setProducts((prev) =>
-        prev.map((p) => {
-          if (p.id === editTarget.id) {
-            return {
-              ...p,
-              name: editProdName,
-              brand: editProdBrand || null,
-              barcode: editProdBarcode || null,
-              imageUrl: editProdImageUrl || null,
-              categoryName: editProdCategory,
-              variants: updatedVariants.map((v, idx) => ({
-                id: v.id || `v-${Date.now()}-${idx}`,
-                label: v.label,
-                retailPrice: v.retailPrice,
-                wholesalePrice: v.wholesalePrice,
-                recentChange: true,
-              })),
-            };
-          }
-          return p;
-        })
-      );
+    setEditTarget(null);
+    toast.success(`Updated ${name}`);
 
-      setEditTarget(null);
-      toast.success(`Updated ${editProdName}`);
-    } catch (err) {
+    // 2. BACKGROUND SERVER PERSISTENCE
+    updateProductAction({
+      id: targetId,
+      name,
+      brand: brand || undefined,
+      barcode: barcode || undefined,
+      imageUrl: imageUrl || undefined,
+      categoryName,
+      variants: updatedVariants.map((v) => ({
+        id: v.id,
+        label: v.label,
+        retailPrice: v.retailPrice,
+        wholesalePrice: v.wholesalePrice,
+      })),
+    }).catch((err) => {
       console.error(err);
-      toast.error("Failed to update product in database");
-    }
+      toast.error("Database sync failed for product update");
+    });
   };
 
   const handleAdminAuth = async (e: React.FormEvent) => {
@@ -238,7 +246,7 @@ export default function CatalogView({
           return;
         }
 
-        setIsAdminState(true);
+        setIsLoggedOut(false);
         if (typeof window !== "undefined") {
           localStorage.setItem("growsary_admin_logged_in", "true");
         }
@@ -252,7 +260,7 @@ export default function CatalogView({
 
         if (res.error) {
           if (adminEmail === "admin@store.com" && adminPassword === "admin123456") {
-            setIsAdminState(true);
+            setIsLoggedOut(false);
             if (typeof window !== "undefined") {
               localStorage.setItem("growsary_admin_logged_in", "true");
             }
@@ -262,7 +270,7 @@ export default function CatalogView({
           }
           setLoginError(res.error.message || "Invalid email or password");
         } else {
-          setIsAdminState(true);
+          setIsLoggedOut(false);
           if (typeof window !== "undefined") {
             localStorage.setItem("growsary_admin_logged_in", "true");
           }
@@ -272,7 +280,7 @@ export default function CatalogView({
       }
     } catch {
       if (adminEmail === "admin@store.com" && adminPassword === "admin123456") {
-        setIsAdminState(true);
+        setIsLoggedOut(false);
         if (typeof window !== "undefined") {
           localStorage.setItem("growsary_admin_logged_in", "true");
         }
@@ -285,8 +293,12 @@ export default function CatalogView({
   };
 
   const handleAdminLogout = async () => {
-    await authClient.signOut();
-    setIsAdminState(false);
+    try {
+      await authClient.signOut();
+    } catch (err) {
+      console.error("Auth signOut error:", err);
+    }
+    setIsLoggedOut(true);
     if (typeof window !== "undefined") {
       localStorage.removeItem("growsary_admin_logged_in");
     }
@@ -388,98 +400,123 @@ export default function CatalogView({
     setIsCartOpen(false);
   };
 
-  const toggleStock = async (product: CatalogProduct) => {
-    try {
-      await toggleProductStockAction(product.id, product.isOutOfStock);
-      setProducts((prev) =>
-        prev.map((p) => (p.id === product.id ? { ...p, isOutOfStock: !p.isOutOfStock } : p))
-      );
-      toast.info(`${product.name} marked as ${!product.isOutOfStock ? "Unavailable" : "In Stock"}`);
-    } catch (err) {
+  const toggleStock = (product: CatalogProduct) => {
+    const nextStatus = !product.isOutOfStock;
+
+    // 1. INSTANT OPTIMISTIC CLIENT UPDATE
+    setProducts((prev) =>
+      prev.map((p) => (p.id === product.id ? { ...p, isOutOfStock: nextStatus } : p))
+    );
+    toast.info(`${product.name} marked as ${nextStatus ? "Unavailable" : "In Stock"}`);
+
+    // 2. BACKGROUND SERVER PERSISTENCE
+    toggleProductStockAction(product.id, product.isOutOfStock).catch((err) => {
       console.error(err);
       toast.error("Failed to update stock status in database");
-    }
+    });
   };
 
-  const handleCreateProduct = async (e: React.FormEvent) => {
+  const handleCreateProduct = (e: React.FormEvent) => {
     e.preventDefault();
 
+    const tempId = `p-temp-${Date.now()}`;
     const targetCategory =
       isAddingCustomCategory && customCategoryName.trim()
         ? customCategoryName.trim()
         : newProdCategory;
 
-    try {
-      const created = await createProductAction({
-        name: newProdName,
-        brand: newProdBrand || undefined,
-        barcode: newProdBarcode || undefined,
-        imageUrl: newProdImageUrl || undefined,
-        categoryName: targetCategory,
-        variantLabel: newProdVariantLabel || "Standard",
-        retailPrice: Number(newProdRetail) || 0,
-        wholesalePrice: Number(newProdWholesale) || 0,
-      });
+    const name = newProdName;
+    const brand = newProdBrand;
+    const barcode = newProdBarcode;
+    const imageUrl = newProdImageUrl;
+    const variantLabel = newProdVariantLabel || "Standard";
+    const retailPrice = Number(newProdRetail) || 0;
+    const wholesalePrice = Number(newProdWholesale) || 0;
 
-      // Dynamically register new category chip if custom category was created
-      if (isAddingCustomCategory && customCategoryName.trim()) {
-        if (!categories.some((c) => c.name.toLowerCase() === targetCategory.toLowerCase())) {
-          setCategories((prev) => [
-            ...prev,
-            { id: `cat-${Date.now()}`, name: targetCategory, productCount: 1 },
-          ]);
-        }
+    // 1. INSTANT OPTIMISTIC CLIENT UPDATE (Closes modal immediately)
+    if (isAddingCustomCategory && customCategoryName.trim()) {
+      if (!categories.some((c) => c.name.toLowerCase() === targetCategory.toLowerCase())) {
+        setCategories((prev) => [
+          ...prev,
+          { id: `cat-${Date.now()}`, name: targetCategory, productCount: 1 },
+        ]);
       }
-
-      const newProd: CatalogProduct = {
-        id: created.id,
-        name: newProdName,
-        brand: newProdBrand || null,
-        barcode: newProdBarcode || null,
-        imageUrl: newProdImageUrl || null,
-        isOutOfStock: false,
-        categoryId: created.categoryId,
-        categoryName: targetCategory,
-        hasRecentPriceChange: true,
-        variants: [
-          {
-            id: `v-${Date.now()}`,
-            label: newProdVariantLabel || "Standard",
-            retailPrice: Number(newProdRetail) || 0,
-            wholesalePrice: Number(newProdWholesale) || 0,
-            recentChange: true,
-          },
-        ],
-      };
-
-      setProducts((prev) => [newProd, ...prev]);
-      setIsAddProductOpen(false);
-      toast.success(`Added ${newProdName} to ${targetCategory}`);
-      setNewProdName("");
-      setNewProdBrand("");
-      setNewProdBarcode("");
-      setNewProdImageUrl("");
-      setNewProdRetail("");
-      setNewProdWholesale("");
-      setIsAddingCustomCategory(false);
-      setCustomCategoryName("");
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to save new product to database");
     }
+
+    const newProd: CatalogProduct = {
+      id: tempId,
+      name,
+      brand: brand || null,
+      barcode: barcode || null,
+      imageUrl: imageUrl || null,
+      isOutOfStock: false,
+      categoryId: `cat-${targetCategory}`,
+      categoryName: targetCategory,
+      hasRecentPriceChange: true,
+      variants: [
+        {
+          id: `v-temp-${Date.now()}`,
+          label: variantLabel,
+          retailPrice,
+          wholesalePrice,
+          recentChange: true,
+        },
+      ],
+    };
+
+    setProducts((prev) => [newProd, ...prev]);
+    setIsAddProductOpen(false);
+    toast.success(`Added ${name} to ${targetCategory}`);
+
+    // Reset inputs
+    setNewProdName("");
+    setNewProdBrand("");
+    setNewProdBarcode("");
+    setNewProdImageUrl("");
+    setNewProdRetail("");
+    setNewProdWholesale("");
+    setIsAddingCustomCategory(false);
+    setCustomCategoryName("");
+
+    // 2. BACKGROUND SERVER PERSISTENCE
+    createProductAction({
+      name,
+      brand: brand || undefined,
+      barcode: barcode || undefined,
+      imageUrl: imageUrl || undefined,
+      categoryName: targetCategory,
+      variantLabel,
+      retailPrice,
+      wholesalePrice,
+    })
+      .then((created) => {
+        // Update temporary ID with real DB ID
+        setProducts((prev) =>
+          prev.map((p) => (p.id === tempId ? { ...p, id: created.id, categoryId: created.categoryId } : p))
+        );
+      })
+      .catch((err) => {
+        console.error(err);
+        toast.error("Database sync failed for adding product");
+      });
   };
 
-  const handleDeleteProduct = async () => {
+  const handleDeleteProduct = () => {
     if (!deleteTarget) return;
-    try {
-      await deleteProductAction(deleteTarget.id);
-      setProducts((prev) => prev.filter((p) => p.id !== deleteTarget.id));
-      toast.error(`Deleted ${deleteTarget.name}`);
-      setDeleteTarget(null);
-    } catch (err) {
+
+    const targetId = deleteTarget.id;
+    const targetName = deleteTarget.name;
+
+    // 1. INSTANT OPTIMISTIC CLIENT UPDATE (Closes modal immediately)
+    setProducts((prev) => prev.filter((p) => p.id !== targetId));
+    toast.error(`Deleted ${targetName}`);
+    setDeleteTarget(null);
+
+    // 2. BACKGROUND SERVER PERSISTENCE
+    deleteProductAction(targetId).catch((err) => {
       console.error(err);
-      toast.error("Failed to delete product from database");
-    }
+      toast.error("Database sync failed for product deletion");
+    });
   };
 
   // Filter products by category and search term
