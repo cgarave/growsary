@@ -2,6 +2,8 @@
 
 import React from "react";
 import { X } from "lucide-react";
+import { Button } from "@/components/ui/button"
+
 import { CatalogCategory } from "@/app/actions";
 
 interface CategoryFilterBarProps {
@@ -20,7 +22,7 @@ export default function CategoryFilterBar({
   onDeleteCategory,
 }: CategoryFilterBarProps) {
   return (
-    <div className="chips">
+    <div className="flex flex-row gap-x-2 p-4">
       <div
         className={`chip ${selectedCategory === "All" ? "active" : ""}`}
         onClick={() => onSelectCategory("All")}

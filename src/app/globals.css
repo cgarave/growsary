@@ -170,7 +170,7 @@ header {
   height: calc(100% - 6px);
   background: var(--teal);
   border-radius: 999px;
-  transition: transform .25s cubic-bezier(.4,0,.2,1);
+  transition: transform .25s cubic-bezier(.4, 0, .2, 1);
 }
 
 .price-toggle.wholesale .knob {
@@ -193,7 +193,7 @@ header {
   transition: color .2s;
 }
 
-.price-toggle.retail button:first-child {
+.price-toggle.retail button:nth-child(2) {
   color: #fff;
 }
 
@@ -327,7 +327,8 @@ main {
   opacity: 0.5;
 }
 
-.card.out-of-stock .name, .card.out-of-stock .variant-row .amt {
+.card.out-of-stock .name,
+.card.out-of-stock .variant-row .amt {
   opacity: 0.45;
 }
 
@@ -539,7 +540,7 @@ main {
   display: flex;
   align-items: center;
   gap: 8px;
-  box-shadow: 0 8px 24px rgba(33,90,76,0.35);
+  box-shadow: 0 8px 24px rgba(33, 90, 76, 0.35);
   cursor: pointer;
   z-index: 30;
 }
@@ -549,7 +550,7 @@ main {
   display: flex;
   position: fixed;
   inset: 0;
-  background: rgba(28,27,25,0.55);
+  background: rgba(28, 27, 25, 0.55);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   z-index: 50;
@@ -567,19 +568,29 @@ main {
   padding: 24px 20px 30px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 -8px 30px rgba(0,0,0,0.18);
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.18);
   animation: slideUpSheet 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   -webkit-overflow-scrolling: touch;
 }
 
 @keyframes fadeInOverlay {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes slideUpSheet {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
+  from {
+    transform: translateY(100%);
+  }
+
+  to {
+    transform: translateY(0);
+  }
 }
 
 @media (min-width:640px) {
@@ -587,6 +598,7 @@ main {
     align-items: center;
     padding: 20px;
   }
+
   .modal {
     border-radius: 16px;
     margin-bottom: 0;
@@ -624,7 +636,8 @@ main {
   letter-spacing: 0;
 }
 
-.field input, .field select {
+.field input,
+.field select {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid var(--line);
@@ -635,7 +648,8 @@ main {
   color: var(--ink);
 }
 
-.field input:focus, .field select:focus {
+.field input:focus,
+.field select:focus {
   outline: 2px solid var(--teal-soft);
   border-color: var(--teal);
 }
@@ -939,44 +953,50 @@ footer {
   header {
     padding: 14px 16px 12px;
   }
+
   main {
     padding: 18px 16px 30px;
   }
+
   .grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 10px;
   }
+
   .card {
     padding: 10px;
     gap: 7px;
     border-radius: 12px;
   }
+
   .thumb {
     font-size: 18px;
     border-radius: 8px;
   }
+
   .name {
     font-size: 12px;
   }
+
   .brand-line {
     font-size: 10px;
   }
+
   .variant-row {
     font-size: 11px;
     padding: 3px 0;
   }
+
   .variant-row .amt {
     font-size: 13px;
   }
-  .search {
-    order: 3;
-    max-width: none;
-    flex-basis: 100%;
-  }
+
   .price-toggle {
-    width: 150px;
+    width: 200px;
   }
-  .admin-row button, .stock-btn {
+
+  .admin-row button,
+  .stock-btn {
     font-size: 10px;
     padding: 6px 0;
   }
