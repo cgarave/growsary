@@ -11,6 +11,7 @@ interface AddProductModalProps {
   categories: CatalogCategory[];
   onOpenScanner: () => void;
   onProductCreated: (newProduct: CatalogProduct, newCategoryName?: string) => void;
+  onProductUpdated: (updatedProduct: CatalogProduct) => void;
 }
 
 export default function AddProductModal({
@@ -19,6 +20,7 @@ export default function AddProductModal({
   categories,
   onOpenScanner,
   onProductCreated,
+  onProductUpdated,
 }: AddProductModalProps) {
   const [newProdName, setNewProdName] = useState("");
   const [newProdBrand, setNewProdBrand] = useState("");
@@ -58,50 +60,64 @@ export default function AddProductModal({
       wholesalePrice: parseFloat(v.wholesalePrice) || 0,
     }));
 
+    // 1. INSTANT OPTIMISTIC LOCAL UPDATE (Closes modal immediately, non-blocking)
+    const tempId = `temp-prod-${Date.now()}`;
+    const tempProd: CatalogProduct = {
+      id: tempId,
+      name: newProdName,
+      brand: newProdBrand || null,
+      barcode: newProdBarcode || null,
+      imageUrl: newProdImageUrl || null,
+      isOutOfStock: false,
+      categoryId: `cat-temp`,
+      categoryName: finalCategory,
+      hasRecentPriceChange: true,
+      variants: validVariants.map((v, idx) => ({
+        id: `v-new-${Date.now()}-${idx}`,
+        label: v.label,
+        retailPrice: v.retailPrice,
+        wholesalePrice: v.wholesalePrice,
+        recentChange: true,
+      })),
+    };
+
+    toast.success(`Created product "${newProdName}"!`);
+    onProductCreated(tempProd, isAddingCustomCategory ? finalCategory : undefined);
+    onClose();
+
+    // Reset form fields immediately
+    const nameToSave = newProdName;
+    const brandToSave = newProdBrand;
+    const barcodeToSave = newProdBarcode;
+    const imageToSave = newProdImageUrl;
+
+    setNewProdName("");
+    setNewProdBrand("");
+    setIsAddingCustomCategory(false);
+    setCustomCategoryName("");
+    setNewProdImageUrl("");
+    setNewProdBarcode("");
+    setNewProdVariants([{ label: "Standard", retailPrice: "", wholesalePrice: "" }]);
+
+    // 2. BACKGROUND SERVER CALL
     try {
       const created = await createProductAction({
-        name: newProdName,
-        brand: newProdBrand || undefined,
+        name: nameToSave,
+        brand: brandToSave || undefined,
         categoryName: finalCategory,
-        imageUrl: newProdImageUrl || undefined,
-        barcode: newProdBarcode || undefined,
+        imageUrl: imageToSave || undefined,
+        barcode: barcodeToSave || undefined,
         variants: validVariants,
       });
 
-      // Format for local state
-      const formattedProd: CatalogProduct = {
+      // Update local state with official DB id
+      onProductUpdated({
+        ...tempProd,
         id: created.id,
-        name: created.name,
-        brand: created.brand,
-        barcode: created.barcode,
-        imageUrl: created.imageUrl,
-        isOutOfStock: created.isOutOfStock,
         categoryId: created.categoryId,
-        categoryName: finalCategory,
-        hasRecentPriceChange: true,
-        variants: validVariants.map((v, idx) => ({
-          id: `v-new-${Date.now()}-${idx}`,
-          label: v.label,
-          retailPrice: v.retailPrice,
-          wholesalePrice: v.wholesalePrice,
-          recentChange: true,
-        })),
-      };
-
-      toast.success(`Created product "${newProdName}"!`);
-      onProductCreated(formattedProd, isAddingCustomCategory ? finalCategory : undefined);
-
-      // Reset form
-      setNewProdName("");
-      setNewProdBrand("");
-      setIsAddingCustomCategory(false);
-      setCustomCategoryName("");
-      setNewProdImageUrl("");
-      setNewProdBarcode("");
-      setNewProdVariants([{ label: "Standard", retailPrice: "", wholesalePrice: "" }]);
-      onClose();
+      });
     } catch (err: any) {
-      toast.error(err.message || "Failed to create product");
+      toast.error(err.message || "Failed to save product in database");
     }
   };
 

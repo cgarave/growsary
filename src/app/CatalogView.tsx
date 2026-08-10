@@ -81,22 +81,6 @@ export default function CatalogView({
    * ==============================================================================
    * SUPABASE REALTIME WEBSOCKETS + WINDOW FOCUS SYNC HOOK
    * ==============================================================================
-   * 
-   * HOW IT WORKS:
-   * 1. REALTIME WEBSOCKETS CHANNEL:
-   *    We subscribe to Supabase PostgreSQL changes ("postgres_changes") on the "public" schema.
-   *    When ANY database operation occurs (INSERT a product, UPDATE prices, DELETE a category),
-   *    Supabase pushes a tiny notification over an active WebSocket directly to all open devices
-   *    (phone, laptop, tablet).
-   * 
-   *    When an event arrives, fetchLatestData() runs and updates local React state seamlessly.
-   *    Because this relies on WebSockets push notifications, it uses ZERO continuous database
-   *    polling queries, protecting your Supabase Free Tier quota 100%!
-   * 
-   * 2. WINDOW FOCUS / VISIBILITY SYNC (FALLBACK & INSTANT WAKE-UP):
-   *    When you unlock your mobile phone screen or switch tabs back to Growsary,
-   *    the browser triggers a "focus" or "visibilitychange" event.
-   *    We call fetchLatestData() immediately so you see the newest database state instantly.
    */
   useEffect(() => {
     let isSubscribed = true;
@@ -222,7 +206,7 @@ export default function CatalogView({
     setIsLoggedOut(false);
   };
 
-  // Product CRUD state updates
+  // Product CRUD state updates (NON-BLOCKING OPTIMISTIC UI)
   const handleProductCreated = (newProduct: CatalogProduct, newCategoryName?: string) => {
     setProducts((prev) => [newProduct, ...prev]);
     if (newCategoryName && !categories.some((c) => c.name === newCategoryName)) {
@@ -245,43 +229,67 @@ export default function CatalogView({
 
   const handleDeleteProduct = async () => {
     if (!deleteTarget) return;
+    const target = deleteTarget;
+
+    // 1. INSTANT OPTIMISTIC DELETE (Closes modal immediately)
+    setProducts((prev) => prev.filter((p) => p.id !== target.id));
+    setDeleteTarget(null);
+    toast.success(`Deleted "${target.name}"`);
+
+    // 2. BACKGROUND SERVER CALL
     try {
-      await deleteProductAction(deleteTarget.id);
-      toast.success(`Deleted "${deleteTarget.name}"`);
-      setProducts((prev) => prev.filter((p) => p.id !== deleteTarget.id));
-      setDeleteTarget(null);
+      await deleteProductAction(target.id);
     } catch (err: any) {
-      toast.error(err.message || "Failed to delete product");
+      toast.error(err.message || "Failed to delete product in database");
+      // Rollback on failure
+      setProducts((prev) => [target, ...prev]);
     }
   };
 
   const handleDeleteCategory = async () => {
     if (!deleteCategoryTarget) return;
+    const target = deleteCategoryTarget;
+
+    // 1. INSTANT OPTIMISTIC DELETE (Closes modal immediately)
+    setCategories((prev) => prev.filter((c) => c.id !== target.id));
+    if (selectedCategory === target.name) {
+      setSelectedCategory("All");
+    }
+    setDeleteCategoryTarget(null);
+    toast.success(`Deleted category "${target.name}"`);
+
+    // 2. BACKGROUND SERVER CALL
     try {
-      await deleteCategoryAction(deleteCategoryTarget.id);
-      toast.success(`Deleted category "${deleteCategoryTarget.name}"`);
-      setCategories((prev) => prev.filter((c) => c.id !== deleteCategoryTarget.id));
-      if (selectedCategory === deleteCategoryTarget.name) {
-        setSelectedCategory("All");
-      }
-      setDeleteCategoryTarget(null);
+      await deleteCategoryAction(target.id);
     } catch (err: any) {
-      toast.error(err.message || "Failed to delete category");
+      toast.error(err.message || "Failed to delete category in database");
+      // Rollback on failure
+      setCategories((prev) => [...prev, target]);
     }
   };
 
   const handleToggleStock = async (product: CatalogProduct) => {
     const nextStatus = !product.isOutOfStock;
+
+    // 1. INSTANT OPTIMISTIC TOGGLE
+    setProducts((prev) =>
+      prev.map((p) =>
+        p.id === product.id ? { ...p, isOutOfStock: nextStatus } : p
+      )
+    );
+    toast.info(`"${product.name}" marked as ${nextStatus ? "Out of Stock" : "In Stock"}`);
+
+    // 2. BACKGROUND SERVER CALL
     try {
       await toggleProductStockAction(product.id, product.isOutOfStock);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update stock state in database");
+      // Rollback on failure
       setProducts((prev) =>
         prev.map((p) =>
-          p.id === product.id ? { ...p, isOutOfStock: nextStatus } : p
+          p.id === product.id ? { ...p, isOutOfStock: !nextStatus } : p
         )
       );
-      toast.info(`"${product.name}" marked as ${nextStatus ? "Out of Stock" : "In Stock"}`);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to update stock state");
     }
   };
 
@@ -395,6 +403,7 @@ export default function CatalogView({
           setIsScannerOpen(true);
         }}
         onProductCreated={handleProductCreated}
+        onProductUpdated={handleProductUpdated}
       />
 
       {/* Edit Product Modal */}
