@@ -4,6 +4,7 @@ import React, { useState, useRef } from "react";
 import { Bot, Send, Image as ImageIcon, X, Loader2, Sparkles } from "lucide-react";
 import { processAiProductMessageAction, ParsedProductAI } from "@/app/ai-actions";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button"
 
 interface MessageItem {
   id: string;
@@ -160,7 +161,7 @@ export default function AdminAiChatbot({ existingCategories }: AdminAiChatbotPro
   return (
     <>
       {/* AI Assistant Button Component */}
-      <button
+      {/* <button
         type="button"
         className="ai-assistant-btn"
         onClick={() => setIsOpen((prev) => !prev)}
@@ -182,8 +183,10 @@ export default function AdminAiChatbot({ existingCategories }: AdminAiChatbotPro
         }}
       >
         <Sparkles width="15" height="15" />
-        AI Assistant
-      </button>
+      </button> */}
+      <Button variant="outline" className="border-zinc-300 rounded-[9px] text-xs" onClick={() => setIsOpen((prev) => !prev)}>
+        <Sparkles data-icon="inline-start" /> AI
+      </Button>
 
       {/* AI Chat Drawer / Modal - Mobile Friendly */}
       {isOpen && (
@@ -217,238 +220,238 @@ export default function AdminAiChatbot({ existingCategories }: AdminAiChatbotPro
               overflow: "hidden",
             }}
           >
-          {/* Header */}
-          <div
-            style={{
-              padding: "12px 16px",
-              background: "linear-gradient(135deg, #6366f1 0%, #a855f7 100%)",
-              color: "#fff",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <Bot width="20" height="20" />
-              <div>
-                <div style={{ fontWeight: 700, fontSize: "14px", lineHeight: "1.2" }}>Growsary AI</div>
-                <div style={{ fontSize: "11px", opacity: 0.9 }}>Add products via text or photo</div>
-              </div>
-            </div>
-            <button
-              onClick={() => setIsOpen(false)}
-              style={{ background: "none", border: "none", color: "#fff", cursor: "pointer", padding: "4px" }}
+            {/* Header */}
+            <div
+              style={{
+                padding: "12px 16px",
+                background: "linear-gradient(135deg, #6366f1 0%, #a855f7 100%)",
+                color: "#fff",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
             >
-              <X width="18" height="18" />
-            </button>
-          </div>
-
-          {/* Messages Body */}
-          <div
-            style={{
-              flex: 1,
-              padding: "12px",
-              overflowY: "auto",
-              display: "flex",
-              flexDirection: "column",
-              gap: "10px",
-              background: "var(--bg)",
-            }}
-          >
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                style={{
-                  alignSelf: msg.sender === "user" ? "flex-end" : "flex-start",
-                  maxWidth: "85%",
-                }}
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <Bot width="20" height="20" />
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: "14px", lineHeight: "1.2" }}>Growsary AI</div>
+                  <div style={{ fontSize: "11px", opacity: 0.9 }}>Add products via text or photo</div>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsOpen(false)}
+                style={{ background: "none", border: "none", color: "#fff", cursor: "pointer", padding: "4px" }}
               >
+                <X width="18" height="18" />
+              </button>
+            </div>
+
+            {/* Messages Body */}
+            <div
+              style={{
+                flex: 1,
+                padding: "12px",
+                overflowY: "auto",
+                display: "flex",
+                flexDirection: "column",
+                gap: "10px",
+                background: "var(--bg)",
+              }}
+            >
+              {messages.map((msg) => (
                 <div
+                  key={msg.id}
                   style={{
-                    padding: "10px 12px",
-                    borderRadius: msg.sender === "user" ? "14px 14px 2px 14px" : "14px 14px 14px 2px",
-                    background: msg.sender === "user" ? "var(--teal)" : "var(--paper)",
-                    color: msg.sender === "user" ? "#ffffff" : "var(--ink)",
-                    border: msg.sender === "user" ? "none" : "1px solid var(--line)",
-                    fontSize: "13px",
-                    lineHeight: "1.4",
-                    boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+                    alignSelf: msg.sender === "user" ? "flex-end" : "flex-start",
+                    maxWidth: "85%",
                   }}
                 >
-                  {msg.imagePreview && (
-                    <img
-                      src={msg.imagePreview}
-                      alt="Uploaded preview"
-                      style={{ width: "100%", height: "auto", borderRadius: "8px", marginBottom: "6px" }}
-                    />
-                  )}
-                  <div style={{ whiteSpace: "pre-line" }}>{msg.text}</div>
+                  <div
+                    style={{
+                      padding: "10px 12px",
+                      borderRadius: msg.sender === "user" ? "14px 14px 2px 14px" : "14px 14px 14px 2px",
+                      background: msg.sender === "user" ? "var(--teal)" : "var(--paper)",
+                      color: msg.sender === "user" ? "#ffffff" : "var(--ink)",
+                      border: msg.sender === "user" ? "none" : "1px solid var(--line)",
+                      fontSize: "13px",
+                      lineHeight: "1.4",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+                    }}
+                  >
+                    {msg.imagePreview && (
+                      <img
+                        src={msg.imagePreview}
+                        alt="Uploaded preview"
+                        style={{ width: "100%", height: "auto", borderRadius: "8px", marginBottom: "6px" }}
+                      />
+                    )}
+                    <div style={{ whiteSpace: "pre-line" }}>{msg.text}</div>
 
-                  {/* Category Clarification Options */}
-                  {msg.pendingCategoryClarification && (
-                    <div style={{ marginTop: "10px", display: "flex", flexDirection: "column", gap: "6px" }}>
-                      <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--muted)" }}>
-                        Select a category to save:
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleConfirmCategoryChoice(
-                            msg.pendingCategoryClarification!.suggestedCategory,
-                            msg.pendingCategoryClarification!.product
-                          )
-                        }
-                        style={{
-                          background: "var(--teal-soft)",
-                          color: "var(--teal)",
-                          border: "1px solid var(--teal-soft)",
-                          borderRadius: "8px",
-                          padding: "6px 10px",
-                          fontSize: "12px",
-                          fontWeight: 700,
-                          cursor: "pointer",
-                          textAlign: "left",
-                        }}
-                      >
-                        ✨ Create new: &quot;{msg.pendingCategoryClarification.suggestedCategory}&quot;
-                      </button>
-
-                      {existingCategories.map((cat) => (
+                    {/* Category Clarification Options */}
+                    {msg.pendingCategoryClarification && (
+                      <div style={{ marginTop: "10px", display: "flex", flexDirection: "column", gap: "6px" }}>
+                        <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--muted)" }}>
+                          Select a category to save:
+                        </div>
                         <button
-                          key={cat}
                           type="button"
                           onClick={() =>
-                            handleConfirmCategoryChoice(cat, msg.pendingCategoryClarification!.product)
+                            handleConfirmCategoryChoice(
+                              msg.pendingCategoryClarification!.suggestedCategory,
+                              msg.pendingCategoryClarification!.product
+                            )
                           }
                           style={{
-                            background: "var(--paper)",
-                            color: "var(--ink)",
-                            border: "1px solid var(--line)",
+                            background: "var(--teal-soft)",
+                            color: "var(--teal)",
+                            border: "1px solid var(--teal-soft)",
                             borderRadius: "8px",
                             padding: "6px 10px",
                             fontSize: "12px",
+                            fontWeight: 700,
                             cursor: "pointer",
                             textAlign: "left",
                           }}
                         >
-                          Use existing: &quot;{cat}&quot;
+                          ✨ Create new: &quot;{msg.pendingCategoryClarification.suggestedCategory}&quot;
                         </button>
-                      ))}
-                    </div>
-                  )}
+
+                        {existingCategories.map((cat) => (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() =>
+                              handleConfirmCategoryChoice(cat, msg.pendingCategoryClarification!.product)
+                            }
+                            style={{
+                              background: "var(--paper)",
+                              color: "var(--ink)",
+                              border: "1px solid var(--line)",
+                              borderRadius: "8px",
+                              padding: "6px 10px",
+                              fontSize: "12px",
+                              cursor: "pointer",
+                              textAlign: "left",
+                            }}
+                          >
+                            Use existing: &quot;{cat}&quot;
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
-            {isLoading && (
-              <div style={{ alignSelf: "flex-start", display: "flex", alignItems: "center", gap: "6px", color: "var(--muted)", fontSize: "12px" }}>
-                <Loader2 width="14" height="14" className="animate-spin" />
-                Analyzing product details...
+              ))}
+              {isLoading && (
+                <div style={{ alignSelf: "flex-start", display: "flex", alignItems: "center", gap: "6px", color: "var(--muted)", fontSize: "12px" }}>
+                  <Loader2 width="14" height="14" className="animate-spin" />
+                  Analyzing product details...
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Image Selected Bar */}
+            {selectedImage && (
+              <div
+                style={{
+                  padding: "6px 12px",
+                  background: "var(--paper)",
+                  borderTop: "1px solid var(--line)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <img
+                    src={selectedImage.previewUrl}
+                    alt="Selected"
+                    style={{ width: "24px", height: "24px", borderRadius: "4px", objectFit: "cover" }}
+                  />
+                  <span style={{ fontSize: "11px", color: "var(--muted)" }}>Photo attached</span>
+                </div>
+                <button
+                  onClick={() => setSelectedImage(null)}
+                  style={{ background: "none", border: "none", cursor: "pointer", color: "var(--red)" }}
+                >
+                  <X width="14" height="14" />
+                </button>
               </div>
             )}
-            <div ref={messagesEndRef} />
-          </div>
 
-          {/* Image Selected Bar */}
-          {selectedImage && (
+            {/* Input Footer */}
             <div
               style={{
-                padding: "6px 12px",
+                padding: "10px",
                 background: "var(--paper)",
                 borderTop: "1px solid var(--line)",
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "space-between",
+                gap: "6px",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <img
-                  src={selectedImage.previewUrl}
-                  alt="Selected"
-                  style={{ width: "24px", height: "24px", borderRadius: "4px", objectFit: "cover" }}
-                />
-                <span style={{ fontSize: "11px", color: "var(--muted)" }}>Photo attached</span>
-              </div>
+              <input
+                type="file"
+                accept="image/*"
+                ref={fileInputRef}
+                onChange={handleImageSelect}
+                style={{ display: "none" }}
+              />
               <button
-                onClick={() => setSelectedImage(null)}
-                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--red)" }}
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                title="Attach photo/receipt"
+                style={{
+                  background: "var(--bg)",
+                  border: "1px solid var(--line)",
+                  borderRadius: "8px",
+                  padding: "8px",
+                  color: "var(--muted)",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                }}
               >
-                <X width="14" height="14" />
+                <ImageIcon width="16" height="16" />
+              </button>
+              <input
+                type="text"
+                placeholder="e.g. Sprite 1.5L ₱65 retail ₱55 wholesale"
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+                disabled={isLoading}
+                style={{
+                  flex: 1,
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid var(--line)",
+                  fontSize: "12px",
+                  outline: "none",
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => handleSendMessage()}
+                disabled={isLoading || (!inputText.trim() && !selectedImage)}
+                style={{
+                  background: "var(--teal)",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "8px",
+                  padding: "8px 12px",
+                  cursor: isLoading ? "not-allowed" : "pointer",
+                  opacity: isLoading || (!inputText.trim() && !selectedImage) ? 0.6 : 1,
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
+                <Send width="14" height="14" />
               </button>
             </div>
-          )}
-
-          {/* Input Footer */}
-          <div
-            style={{
-              padding: "10px",
-              background: "var(--paper)",
-              borderTop: "1px solid var(--line)",
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-            }}
-          >
-            <input
-              type="file"
-              accept="image/*"
-              ref={fileInputRef}
-              onChange={handleImageSelect}
-              style={{ display: "none" }}
-            />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              title="Attach photo/receipt"
-              style={{
-                background: "var(--bg)",
-                border: "1px solid var(--line)",
-                borderRadius: "8px",
-                padding: "8px",
-                color: "var(--muted)",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-              }}
-            >
-              <ImageIcon width="16" height="16" />
-            </button>
-            <input
-              type="text"
-              placeholder="e.g. Sprite 1.5L ₱65 retail ₱55 wholesale"
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-              disabled={isLoading}
-              style={{
-                flex: 1,
-                padding: "8px 10px",
-                borderRadius: "8px",
-                border: "1px solid var(--line)",
-                fontSize: "12px",
-                outline: "none",
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => handleSendMessage()}
-              disabled={isLoading || (!inputText.trim() && !selectedImage)}
-              style={{
-                background: "var(--teal)",
-                color: "#fff",
-                border: "none",
-                borderRadius: "8px",
-                padding: "8px 12px",
-                cursor: isLoading ? "not-allowed" : "pointer",
-                opacity: isLoading || (!inputText.trim() && !selectedImage) ? 0.6 : 1,
-                display: "flex",
-                alignItems: "center",
-              }}
-            >
-              <Send width="14" height="14" />
-            </button>
           </div>
         </div>
-      </div>
       )}
     </>
   );
