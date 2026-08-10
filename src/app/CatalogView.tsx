@@ -7,6 +7,7 @@ import {
   CatalogCategory,
   CatalogProduct,
   VariantPrice,
+  getCatalogData,
   deleteProductAction,
   deleteCategoryAction,
   toggleProductStockAction,
@@ -25,6 +26,7 @@ import EditProductModal from "@/components/catalog/EditProductModal";
 import DeleteConfirmModal from "@/components/catalog/DeleteConfirmModal";
 import VariantModal from "@/components/catalog/VariantModal";
 import CartModal from "@/components/catalog/CartModal";
+import { supabase } from "@/lib/supabase-client";
 
 interface CatalogViewProps {
   initialCategories: CatalogCategory[];
@@ -74,6 +76,83 @@ export default function CatalogView({
     productName: string;
     variant: VariantPrice;
   } | null>(null);
+
+  /**
+   * ==============================================================================
+   * SUPABASE REALTIME WEBSOCKETS + WINDOW FOCUS SYNC HOOK
+   * ==============================================================================
+   * 
+   * HOW IT WORKS:
+   * 1. REALTIME WEBSOCKETS CHANNEL:
+   *    We subscribe to Supabase PostgreSQL changes ("postgres_changes") on the "public" schema.
+   *    When ANY database operation occurs (INSERT a product, UPDATE prices, DELETE a category),
+   *    Supabase pushes a tiny notification over an active WebSocket directly to all open devices
+   *    (phone, laptop, tablet).
+   * 
+   *    When an event arrives, fetchLatestData() runs and updates local React state seamlessly.
+   *    Because this relies on WebSockets push notifications, it uses ZERO continuous database
+   *    polling queries, protecting your Supabase Free Tier quota 100%!
+   * 
+   * 2. WINDOW FOCUS / VISIBILITY SYNC (FALLBACK & INSTANT WAKE-UP):
+   *    When you unlock your mobile phone screen or switch tabs back to Growsary,
+   *    the browser triggers a "focus" or "visibilitychange" event.
+   *    We call fetchLatestData() immediately so you see the newest database state instantly.
+   */
+  useEffect(() => {
+    let isSubscribed = true;
+
+    // Helper to fetch latest fresh catalog from Supabase via Server Action
+    const fetchLatestData = async () => {
+      // Pause automatic state updates while an admin is actively editing a form in a modal
+      if (isAddProductOpen || editTarget) return;
+
+      try {
+        const fresh = await getCatalogData();
+        if (isSubscribed) {
+          setProducts(fresh.products);
+          setCategories(fresh.categories);
+        }
+      } catch (err) {
+        console.error("Failed to sync catalog data:", err);
+      }
+    };
+
+    // A. SUBSCRIBE TO SUPABASE REALTIME WEBSOCKETS
+    const channel = supabase
+      .channel("public-db-changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public" },
+        (payload) => {
+          console.log("⚡ Realtime Supabase Database Change Push Received:", payload);
+          fetchLatestData();
+        }
+      )
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          console.log("🟢 Connected to Supabase Realtime WebSockets channel!");
+        }
+      });
+
+    // B. LISTEN TO WINDOW FOCUS & TAB VISIBILITY EVENTS
+    const handleFocus = () => fetchLatestData();
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        fetchLatestData();
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    // CLEANUP ON UNMOUNT
+    return () => {
+      isSubscribed = false;
+      supabase.removeChannel(channel);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [isAddProductOpen, editTarget]);
 
   // Load saved cart from localStorage
   useEffect(() => {

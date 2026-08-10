@@ -32,6 +32,15 @@ export interface CatalogCategory {
   productCount: number;
 }
 
+/**
+ * ==============================================================================
+ * SERVER-SIDE CATALOG DATA FETCHING & REVALIDATION
+ * ==============================================================================
+ * 
+ * We tag cached results with "catalog" so that when any mutation (create, update,
+ * delete, stock toggle) occurs, calling revalidateTag("catalog", "max") purges stale
+ * data immediately across Next.js server instances.
+ */
 export const getCatalogData = unstable_cache(
   async () => {
     const categories = await prisma.category.findMany({
@@ -43,66 +52,66 @@ export const getCatalogData = unstable_cache(
       },
     });
 
-  const rawProducts = await prisma.product.findMany({
-    include: {
-      category: true,
-      variants: {
-        include: {
-          prices: {
-            orderBy: { effectiveFrom: "desc" },
+    const rawProducts = await prisma.product.findMany({
+      include: {
+        category: true,
+        variants: {
+          include: {
+            prices: {
+              orderBy: { effectiveFrom: "desc" },
+            },
           },
         },
       },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+      orderBy: { createdAt: "desc" },
+    });
 
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-  const products: CatalogProduct[] = rawProducts.map((p) => {
-    let hasRecentChange = false;
+    const products: CatalogProduct[] = rawProducts.map((p) => {
+      let hasRecentChange = false;
 
-    const variants: VariantPrice[] = p.variants.map((v) => {
-      const latestRetail = v.prices.find((pr) => pr.type === "RETAIL");
-      const latestWholesale = v.prices.find((pr) => pr.type === "WHOLESALE");
+      const variants: VariantPrice[] = p.variants.map((v) => {
+        const latestRetail = v.prices.find((pr) => pr.type === "RETAIL");
+        const latestWholesale = v.prices.find((pr) => pr.type === "WHOLESALE");
 
-      const retailAmt = latestRetail ? Number(latestRetail.amount) : 0;
-      const wholesaleAmt = latestWholesale ? Number(latestWholesale.amount) : 0;
+        const retailAmt = latestRetail ? Number(latestRetail.amount) : 0;
+        const wholesaleAmt = latestWholesale ? Number(latestWholesale.amount) : 0;
 
-      const recentChange = v.prices.some(
-        (pr) => new Date(pr.effectiveFrom) >= thirtyDaysAgo
-      );
+        const recentChange = v.prices.some(
+          (pr) => new Date(pr.effectiveFrom) >= thirtyDaysAgo
+        );
 
-      if (recentChange) hasRecentChange = true;
+        if (recentChange) hasRecentChange = true;
+
+        return {
+          id: v.id,
+          label: v.label,
+          retailPrice: retailAmt,
+          wholesalePrice: wholesaleAmt,
+          recentChange,
+        };
+      });
 
       return {
-        id: v.id,
-        label: v.label,
-        retailPrice: retailAmt,
-        wholesalePrice: wholesaleAmt,
-        recentChange,
+        id: p.id,
+        name: p.name,
+        brand: p.brand,
+        barcode: p.barcode,
+        imageUrl: p.imageUrl,
+        isOutOfStock: p.isOutOfStock,
+        categoryId: p.categoryId,
+        categoryName: p.category.name,
+        hasRecentPriceChange: hasRecentChange,
+        variants,
       };
     });
 
-    return {
-      id: p.id,
-      name: p.name,
-      brand: p.brand,
-      barcode: p.barcode,
-      imageUrl: p.imageUrl,
-      isOutOfStock: p.isOutOfStock,
-      categoryId: p.categoryId,
-      categoryName: p.category.name,
-      hasRecentPriceChange: hasRecentChange,
-      variants,
-    };
-  });
-
-  const formattedCategories: CatalogCategory[] = categories.map((c) => ({
-    id: c.id,
-    name: c.name,
-    productCount: c._count.products,
-  }));
+    const formattedCategories: CatalogCategory[] = categories.map((c) => ({
+      id: c.id,
+      name: c.name,
+      productCount: c._count.products,
+    }));
 
     return {
       categories: formattedCategories,
@@ -111,7 +120,7 @@ export const getCatalogData = unstable_cache(
   },
   ["catalog-data"],
   {
-    revalidate: 86400, // Cache for 24 hours (1 day)
+    revalidate: false, // Expire only on-demand via revalidateTag("catalog", "max") when mutations occur
     tags: ["catalog"],
   }
 );
@@ -258,7 +267,7 @@ export async function updateProductAction(data: {
     },
   });
 
-  // Handle deleted variants (variants that existed in DB but were removed in edit form)
+  // Handle deleted variants
   const existingVariants = await prisma.productVariant.findMany({
     where: { productId: data.id },
     select: { id: true },
@@ -282,7 +291,6 @@ export async function updateProductAction(data: {
         data: { label: v.label },
       });
 
-      // Get latest prices to avoid inserting duplicate price history if unchanged
       const latestPrices = await prisma.price.findMany({
         where: { variantId: v.id },
         orderBy: { effectiveFrom: "desc" },
@@ -312,7 +320,6 @@ export async function updateProductAction(data: {
         });
       }
     } else {
-      // New variant added during edit
       await prisma.productVariant.create({
         data: {
           label: v.label || "Standard",
@@ -345,4 +352,3 @@ export async function getPriceHistoryAction(variantId: string) {
     effectiveFrom: p.effectiveFrom.toISOString(),
   }));
 }
-
