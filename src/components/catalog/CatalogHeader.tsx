@@ -51,7 +51,7 @@ export default function CatalogHeader({
 					</div>
 
 					<div className="admin-zone">
-						<Button size={'xs'} className={`border-zinc-300 rounded-[9px] text-xs ${isAdmin ? 'bg-red-500 text-white border-none' : ''}`} onClick={() => (isAdmin ? onLogout() : onOpenLogin())}>
+						<Button size={'xs'} variant="outline" className={`border-zinc-300 rounded-[9px] text-xs ${!isAdmin ? 'bg-black text-white border-none' : ''}`} onClick={() => (isAdmin ? onLogout() : onOpenLogin())}>
 							{isAdmin ? "Log out" : "Admin Login"}
 						</Button>
 					</div>

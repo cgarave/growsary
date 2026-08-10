@@ -188,7 +188,7 @@ export default function CatalogView({
   const handleAdminLogout = async () => {
     try {
       if (session?.user) {
-        await authClient.signOut().catch(() => {});
+        await authClient.signOut().catch(() => { });
       }
     } catch (err) {
       // Ignore network errors when signing out
@@ -342,7 +342,7 @@ export default function CatalogView({
 
   return (
     <div>
-      <Toaster position="bottom-center" />
+      <Toaster position="top-center" />
 
       {/* Header */}
       <CatalogHeader
@@ -483,7 +483,7 @@ export default function CatalogView({
         />
       )}
 
-      <footer>Store Price Board — Connected to live DB.</footer>
+      <footer>Created by Rave</footer>
     </div>
   );
 }

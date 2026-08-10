@@ -43,9 +43,6 @@ export default function ProductCard({
           CATEGORY_EMOJIS[categoryName] || "🥤"
         )}
         {p.isOutOfStock && <div className="oos-badge">Unavailable</div>}
-        {!p.isOutOfStock && p.hasRecentPriceChange && (
-          <div className="change-badge">↑ new</div>
-        )}
         {p.barcode && <div className="barcode-badge">barcode ✓</div>}
       </div>
 
@@ -88,40 +85,41 @@ export default function ProductCard({
         ))}
       </div>
 
-      {!isAdmin && (
-        <button
-          className="card-add-btn"
-          onClick={() => onOpenVariantModal(p)}
-        >
-          <ShoppingBag width="14" height="14" />
-          Add to cart
-        </button>
-      )}
-
-      {isAdmin && (
-        <div className="admin-controls">
+      <div className="flex flex-col gap-y-2 mt-auto">
+        {!isAdmin && (
           <button
-            className="stock-btn"
-            onClick={() => onToggleStock(p)}
+            className="card-add-btn"
+            onClick={() => onOpenVariantModal(p)}
           >
-            {p.isOutOfStock ? "Mark in stock" : "Mark out of stock"}
+            <ShoppingBag width="14" height="14" />
+            Add to cart
           </button>
-          <div className="admin-row">
+        )}
+        {isAdmin && (
+          <div className="admin-controls">
             <button
-              className="edit"
-              onClick={() => onOpenEdit(p)}
+              className="stock-btn"
+              onClick={() => onToggleStock(p)}
             >
-              Edit
+              {p.isOutOfStock ? "Mark in stock" : "Mark out of stock"}
             </button>
-            <button
-              className="del"
-              onClick={() => onDeleteProduct(p)}
-            >
-              Delete
-            </button>
+            <div className="admin-row">
+              <button
+                className="edit"
+                onClick={() => onOpenEdit(p)}
+              >
+                Edit
+              </button>
+              <button
+                className="del"
+                onClick={() => onDeleteProduct(p)}
+              >
+                Delete
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
