@@ -328,8 +328,8 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
   };
 
   /**
-   * Save Memory for Later Handler
-   * Saves only items breakdown and total sum (no base64 image). Limit max 5 items.
+   * Save / Update Memory Handler
+   * Saves new memory if fresh, or updates active memory in-place if revisiting.
    */
   const handleSaveForLater = () => {
     if (calcItems.length === 0) {
@@ -337,6 +337,30 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
       return;
     }
 
+    if (activeMemoryId) {
+      // Re-visiting existing memory -> Update in place
+      const updatedMemories = savedMemories.map((m) =>
+        m.id === activeMemoryId
+          ? {
+              ...m,
+              items: calcItems,
+              totalSum: calcTotalSum,
+              date: new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
+            }
+          : m
+      );
+
+      setSavedMemories(updatedMemories);
+      try {
+        localStorage.setItem(SAVED_MEMORIES_STORAGE_KEY, JSON.stringify(updatedMemories));
+        toast.success("Updated memory changes!");
+      } catch (e) {
+        toast.error("Failed to update memory.");
+      }
+      return;
+    }
+
+    // Creating new memory entry (Max 5 limit check)
     if (savedMemories.length >= MAX_MEMORIES) {
       toast.error(`Memory limit reached (${MAX_MEMORIES} max). Please delete at least one memory to save a new one.`);
       return;
@@ -358,6 +382,20 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
       toast.success("Saved calculation to local memory!");
     } catch (e) {
       toast.error("Failed to save memory.");
+    }
+  };
+
+  /** Close Active Memory View (Clears active workspace without resetting saved list) */
+  const handleCloseActiveMemory = () => {
+    setActiveMemoryId(null);
+    setCalcItems([]);
+    setCalcTotalSum(0);
+    setCalcSelectedImage(null);
+    try {
+      localStorage.removeItem(CALCULATOR_STORAGE_KEY);
+      toast.info("Closed memory view.");
+    } catch (e) {
+      console.error("Error clearing active workspace state:", e);
     }
   };
 
@@ -685,42 +723,55 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
                   )}
                 </div>
 
-                {/* Bottom Calculator Action Footer: "Save for later" (Left) | "Reset" (Right) */}
+                {/* Bottom Calculator Action Footer */}
                 {calcItems.length > 0 && (
                   <div className="pt-2 space-y-2">
                     <div className="flex items-center gap-2">
-                      {/* Left: Save for later button */}
+                      {/* Left: Save (when revisiting activeMemoryId) OR Save for later (new memory) */}
                       <Button
                         variant="outline"
                         onClick={handleSaveForLater}
                         className="flex-1 text-xs font-bold border-teal-200 bg-teal-50 hover:bg-teal-100 text-teal-700 dark:text-teal-300 dark:bg-teal-950 dark:border-teal-900 rounded-xl cursor-pointer"
-                        title="Save calculation result to local memories"
+                        title={activeMemoryId ? "Save changes to this memory" : "Save calculation result to local memories"}
                       >
                         <Bookmark className="w-3.5 h-3.5 mr-1.5 text-teal-600" />
-                        Save for later
+                        {activeMemoryId ? "Save" : "Save for later"}
                       </Button>
 
-                      {/* Right: Reset button */}
-                      <Button
-                        variant="outline"
-                        onClick={handleResetCalculator}
-                        className="flex-1 text-xs font-semibold border-zinc-300 rounded-xl cursor-pointer text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                        title="Reset current calculator view"
-                      >
-                        <RefreshCw className="w-3.5 h-3.5 mr-1 text-zinc-500" />
-                        Reset
-                      </Button>
+                      {/* Beside Save: Delete Memory button (when revisiting) OR Reset button (fresh work) */}
+                      {activeMemoryId ? (
+                        <Button
+                          variant="outline"
+                          onClick={() => handleDeleteMemory(activeMemoryId)}
+                          className="flex-1 text-xs font-bold text-red-600 border-red-200 bg-red-50 hover:bg-red-100 dark:bg-red-950 dark:border-red-900 rounded-xl cursor-pointer"
+                          title="Delete this saved memory"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                          Delete Memory
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          onClick={handleResetCalculator}
+                          className="flex-1 text-xs font-semibold border-zinc-300 rounded-xl cursor-pointer text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                          title="Reset current calculator view"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5 mr-1 text-zinc-500" />
+                          Reset
+                        </Button>
+                      )}
                     </div>
 
-                    {/* Delete Memory Button appears when a saved memory is currently loaded */}
+                    {/* Bottom: Close button when revisiting a memory */}
                     {activeMemoryId && (
                       <Button
                         variant="outline"
-                        onClick={() => handleDeleteMemory(activeMemoryId)}
-                        className="w-full text-xs font-bold text-red-600 border-red-200 bg-red-50 hover:bg-red-100 dark:bg-red-950 dark:border-red-900 rounded-xl cursor-pointer"
+                        onClick={handleCloseActiveMemory}
+                        className="w-full text-xs font-semibold border-zinc-300 dark:border-zinc-700 rounded-xl cursor-pointer text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                        title="Close this memory view"
                       >
-                        <Trash2 className="w-3.5 h-3.5 mr-1.5" />
-                        Delete Saved Memory
+                        <X className="w-3.5 h-3.5 mr-1 text-zinc-500" />
+                        Close Memory
                       </Button>
                     )}
                   </div>
