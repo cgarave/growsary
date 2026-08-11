@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
-import { Search, Camera, ShoppingBag, Plus, Calculator } from "lucide-react";
-import AdminAiChatbot from "@/components/AdminAiChatbot";
-import AdminAiCalculatorModal from "@/components/AdminAiCalculatorModal";
+import React from "react";
+import { Search, Camera, ShoppingBag, Plus } from "lucide-react";
+import AdminAiModalGroup from "@/components/AdminAiModalGroup";
 import { PriceMode } from "./types";
 
 import { Input } from "@/components/ui/input"
@@ -39,8 +38,6 @@ export default function CatalogHeader({
 	onLogout,
 	categories,
 }: CatalogHeaderProps) {
-	const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
-
 	return (
 		<header>
 			<div className="flex flex-col gap-y-2">
@@ -92,19 +89,7 @@ export default function CatalogHeader({
 							<Button variant="outline" className="border-zinc-300 rounded-[9px] text-xs" onClick={onOpenAddProduct}>
 								<Plus data-icon="inline-start" />
 							</Button>
-							<Button
-								variant="outline"
-								className="border-teal-200 bg-teal-50/60 hover:bg-teal-100/60 text-teal-700 dark:text-teal-400 rounded-[9px] text-xs"
-								onClick={() => setIsCalculatorOpen(true)}
-								title="AI Left-Side Photo Calculator"
-							>
-								<Calculator data-icon="inline-start" />
-							</Button>
-							<AdminAiChatbot existingCategories={categories} />
-							<AdminAiCalculatorModal
-								isOpen={isCalculatorOpen}
-								onClose={() => setIsCalculatorOpen(false)}
-							/>
+							<AdminAiModalGroup existingCategories={categories} />
 						</>
 					)}
 				</div>
