@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useRef } from "react";
-import { Bot, Send, Image as ImageIcon, X, Loader2, Sparkles, Calculator } from "lucide-react";
-import { processAiProductMessageAction, processAiCalculatorAction, ParsedProductAI, ParsedProductItem, CalculatorResultAI } from "@/app/ai-actions";
+import { Bot, Send, Image as ImageIcon, X, Loader2, Sparkles } from "lucide-react";
+import { processAiProductMessageAction, ParsedProductAI, ParsedProductItem } from "@/app/ai-actions";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button"
 
@@ -301,101 +301,6 @@ export default function AdminAiChatbot({ existingCategories }: AdminAiChatbotPro
     );
     handleSendMessage(execMessage);
   };
-  /**
-   * AI Calculator Mode Handler
-   * Takes a photo of receipt/prices, sends to processAiCalculatorAction, and appends total sum card.
-   */
-  const handleCalculatorImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please select a valid image file for calculator mode.");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const img = new Image();
-      img.onload = async () => {
-        const canvas = document.createElement("canvas");
-        const MAX_WIDTH = 1024;
-        const MAX_HEIGHT = 1024;
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height) {
-          if (width > MAX_WIDTH) {
-            height *= MAX_WIDTH / width;
-            width = MAX_WIDTH;
-          }
-        } else {
-          if (height > MAX_HEIGHT) {
-            width *= MAX_HEIGHT / height;
-            height = MAX_HEIGHT;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        ctx?.drawImage(img, 0, 0, width, height);
-
-        const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.8);
-        const base64Data = compressedDataUrl.split(",")[1];
-
-        // 1. Show user message with photo
-        const userMsg: MessageItem = {
-          id: `usr-calc-${Date.now()}`,
-          sender: "user",
-          text: "🧮 Analyzed receipt/item prices from photo:",
-          imagePreview: compressedDataUrl,
-        };
-        setMessages((prev) => [...prev, userMsg]);
-
-        // Open chat window if not open
-        setIsOpen(true);
-        setIsLoading(true);
-        setTimeout(scrollToBottom, 100);
-
-        try {
-          // 2. Call Gemini Calculator Action
-          const calcResult = await processAiCalculatorAction({
-            imageBase64: base64Data,
-            imageMimeType: "image/jpeg",
-          });
-
-          // 3. Append AI response message with calculator result card
-          const aiMsg: MessageItem = {
-            id: `ai-calc-${Date.now()}`,
-            sender: "ai",
-            text: calcResult.reply,
-            calculatorCard: {
-              items: calcResult.items,
-              totalSum: calcResult.totalSum,
-            },
-          };
-
-          setMessages((prev) => [...prev, aiMsg]);
-          toast.success(`Calculated grand total: ₱${calcResult.totalSum.toFixed(2)}`);
-        } catch (err: any) {
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `err-calc-${Date.now()}`,
-              sender: "ai",
-              text: `Error calculating prices: ${err.message || "Failed to parse receipt prices."}`,
-            },
-          ]);
-        } finally {
-          setIsLoading(false);
-          setTimeout(scrollToBottom, 100);
-        }
-      };
-      img.src = reader.result as string;
-    };
-    reader.readAsDataURL(file);
-  };
 
   /**
    * Helper Handler: Update Checkbox & Input State for Price Update Confirmation Card
@@ -460,34 +365,15 @@ export default function AdminAiChatbot({ existingCategories }: AdminAiChatbotPro
 
   return (
     <>
-      {/* Hidden File Input for Calculator Mode Photo Upload */}
-      <input
-        type="file"
-        accept="image/*"
-        ref={calculatorFileInputRef}
-        onChange={handleCalculatorImageSelect}
-        style={{ display: "none" }}
-      />
-
-      {/* Admin AI Action Buttons */}
-      <div className="flex items-center gap-1.5">
-        <Button
-          variant="outline"
-          className="border-zinc-300 rounded-[9px] text-xs"
-          onClick={() => setIsOpen((prev) => !prev)}
-          title="AI Store Assistant"
-        >
-          <Sparkles data-icon="inline-start" />
-        </Button>
-        <Button
-          variant="outline"
-          className="border-zinc-300 rounded-[9px] text-xs text-teal-600 border-teal-200 bg-teal-50/50 hover:bg-teal-100/50"
-          onClick={() => calculatorFileInputRef.current?.click()}
-          title="AI Photo Calculator Mode (Upload receipt/price tag to sum total)"
-        >
-          <Calculator data-icon="inline-start" />
-        </Button>
-      </div>
+      {/* AI Assistant Button Component */}
+      <Button
+        variant="outline"
+        className="border-zinc-300 rounded-[9px] text-xs"
+        onClick={() => setIsOpen((prev) => !prev)}
+        title="AI Store Assistant"
+      >
+        <Sparkles data-icon="inline-start" />
+      </Button>
 
       {/* AI Chat Drawer / Modal - Mobile Friendly */}
       {isOpen && (

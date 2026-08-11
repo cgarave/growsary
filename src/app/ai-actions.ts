@@ -529,27 +529,25 @@ export async function processAiCalculatorAction(payload: {
   const ai = new GoogleGenAI({ apiKey });
 
   const systemInstruction = `
-You are an expert AI inventory & receipt calculator for Growsary.
-Your task is to analyze the provided image (receipt, written list of prices, store price tags, or photos of multiple items with prices).
+You are a precise AI visual calculator assistant for Growsary.
+Your task is to analyze the provided image (written price lists, receipts, store tally sheets, or item price tags).
 
-Extraction Guidelines:
-1. Locate all visible price items in the photo.
-2. For each item, extract:
-   - "name": Brief label or product description (e.g., "Coca-Cola 1.5L", "Item #1", "Bread", "Receipt line item").
-   - "price": Numeric price value (e.g., 65.50).
-   - "qty": Optional quantity integer if specified (default to 1).
-3. Compute the grand total sum of all extracted prices (sum of price * qty).
+CRITICAL RULE - LEFT SIDE NUMBERS ONLY:
+- Carefully inspect the image layout.
+- Locate and extract ONLY the numbers or price amounts that are positioned on the LEFT side of the document / photo / line items.
+- Ignore numbers or text on the right side unless they are clearly part of the left-aligned price list.
+- Extract each left-side number as a price item.
 
 Output Format:
 Respond strictly with a JSON object in this format:
 {
   "success": true,
-  "reply": "Friendly summary of the calculated receipt/items",
+  "reply": "Friendly summary of numbers extracted from the left side of the photo",
   "items": [
-    { "name": "Item 1", "price": 45, "qty": 1 },
-    { "name": "Item 2", "price": 120, "qty": 2 }
+    { "name": "Left Entry 1", "price": 45 },
+    { "name": "Left Entry 2", "price": 120 }
   ],
-  "totalSum": 285.00
+  "totalSum": 165.00
 }
 `;
 
@@ -563,7 +561,7 @@ Respond strictly with a JSON object in this format:
             data: payload.imageBase64,
           },
         },
-        { text: "Calculate all prices shown in this image and sum the total." },
+        { text: "Extract ONLY the numbers/prices on the LEFT side of this image and compute their grand total sum." },
       ],
       config: {
         systemInstruction,
