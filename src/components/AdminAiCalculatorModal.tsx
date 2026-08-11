@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState, useRef } from "react";
-import { Calculator, Upload, X, Loader2, RefreshCw, CheckCircle2 } from "lucide-react";
+import { Calculator, Upload, X, Loader2, RefreshCw, CheckCircle2, Download, Camera } from "lucide-react";
 import { processAiCalculatorAction, CalculatorItem } from "@/app/ai-actions";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { toPng } from "html-to-image";
 
 interface AdminAiCalculatorModalProps {
   isOpen: boolean;
@@ -16,30 +17,33 @@ interface AdminAiCalculatorModalProps {
  * 
  * Purpose:
  * Provides a clean, standalone modal specifically for analyzing photos (price lists, receipts, tally sheets)
- * and calculating the sum of numbers located exclusively on the LEFT side of the photo.
+ * and calculating the sum of numbers located exclusively on the RIGHT side of the photo.
  * 
  * Features:
  * - Uses Tailwind CSS for all styling (dark mode compatible, smooth transitions).
  * - Instant image preview with canvas compression before sending to Gemini API.
- * - Extracts and lists left-side numbers with an editable total sum breakdown.
+ * - Extracts and lists right-side numbers with an editable total sum breakdown.
+ * - Includes a "Save as Screenshot" button at the bottom to download the calculation result.
  * - Fully commented for easy code review.
  */
 export default function AdminAiCalculatorModal({
   isOpen,
   onClose,
 }: AdminAiCalculatorModalProps) {
-  // State management for uploaded image, loading indicator, and parsed calculation results
+  // State management for uploaded image, loading indicator, saving screenshot, and parsed calculation results
   const [selectedImage, setSelectedImage] = useState<{
     base64: string;
     mimeType: string;
     previewUrl: string;
   } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isCapturingScreenshot, setIsCapturingScreenshot] = useState(false);
   const [items, setItems] = useState<CalculatorItem[]>([]);
   const [totalSum, setTotalSum] = useState<number>(0);
   const [replyText, setReplyText] = useState<string>("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const modalCardRef = useRef<HTMLDivElement>(null);
 
   if (!isOpen) return null;
 
@@ -134,6 +138,36 @@ export default function AdminAiCalculatorModal({
   };
 
   /**
+   * Screenshot Download Handler:
+   * Captures the calculator modal container as a PNG image and downloads it to the user's device.
+   */
+  const handleSaveScreenshot = async () => {
+    if (!modalCardRef.current) return;
+
+    setIsCapturingScreenshot(true);
+    try {
+      // Generate PNG data URL from modal DOM node
+      const dataUrl = await toPng(modalCardRef.current, {
+        cacheBust: true,
+        backgroundColor: "#ffffff",
+      });
+
+      // Create download link element and trigger download
+      const link = document.createElement("a");
+      link.download = `growsary-calculator-${Date.now()}.png`;
+      link.href = dataUrl;
+      link.click();
+
+      toast.success("Screenshot saved to downloads!");
+    } catch (err: any) {
+      console.error("Screenshot capture failed:", err);
+      toast.error("Failed to generate screenshot image.");
+    } finally {
+      setIsCapturingScreenshot(false);
+    }
+  };
+
+  /**
    * Reset Handler: Clears image and calculation state for next photo
    */
   const handleReset = () => {
@@ -149,8 +183,10 @@ export default function AdminAiCalculatorModal({
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       {/* Standalone Modal Card Container */}
-      <div className="w-full max-w-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[85vh]">
-        
+      <div
+        ref={modalCardRef}
+        className="w-full max-w-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[85vh]"
+      >
         {/* Header Bar */}
         <div className="px-4 py-3 bg-gradient-to-r from-teal-600 to-emerald-600 text-white flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -291,14 +327,34 @@ export default function AdminAiCalculatorModal({
 
         </div>
 
-        {/* Modal Footer Bar */}
-        <div className="p-3 bg-zinc-50 dark:bg-zinc-850 border-t border-zinc-200 dark:border-zinc-800 flex justify-end">
+        {/* Modal Footer Bar with Save as Screenshot Button */}
+        <div className="p-3 bg-zinc-50 dark:bg-zinc-850 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-2">
+          <Button
+            variant="outline"
+            onClick={handleSaveScreenshot}
+            disabled={isCapturingScreenshot}
+            className="text-xs font-bold px-3 py-1.5 border-teal-200 bg-teal-50 hover:bg-teal-100 text-teal-700 dark:text-teal-300 dark:bg-teal-950 dark:border-teal-900 rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs"
+            title="Download PNG screenshot of this calculation"
+          >
+            {isCapturingScreenshot ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Download className="w-3.5 h-3.5 text-teal-600" />
+                Save as Screenshot
+              </>
+            )}
+          </Button>
+
           <Button
             variant="outline"
             onClick={onClose}
-            className="text-xs font-semibold px-4 py-1.5 border-zinc-300 dark:border-zinc-700 rounded-xl"
+            className="text-xs font-semibold px-4 py-1.5 border-zinc-300 dark:border-zinc-700 rounded-xl cursor-pointer"
           >
-            Close Calculator
+            Close
           </Button>
         </div>
 
