@@ -66,31 +66,32 @@ export default function CartModal({
   return (
     <div className="overlay cart-modal" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal relative" style={{ maxWidth: "480px", width: "100%" }}>
-        {/* Close Button Top Right of Drawer/Modal Overlay */}
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "8px" }}>
-          <button
-            onClick={onClose}
-            title="Close cart"
-            aria-label="Close"
-            style={{
-              background: "var(--paper)",
-              border: "1px solid var(--line)",
-              color: "var(--ink)",
-              cursor: "pointer",
-              padding: "6px",
-              borderRadius: "50%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-            }}
-          >
-            <X width="18" height="18" />
-          </button>
-        </div>
+        <button
+          onClick={onClose}
+          className="modal-close-btn"
+          title="Close cart"
+          aria-label="Close"
+          style={{
+            position: "absolute",
+            top: "16px",
+            right: "16px",
+            background: "none",
+            border: "none",
+            color: "var(--muted)",
+            cursor: "pointer",
+            padding: "4px",
+            borderRadius: "6px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10,
+          }}
+        >
+          <X width="18" height="18" />
+        </button>
 
         <div ref={cartRef} style={{ background: "var(--paper)", padding: "16px", borderRadius: "12px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px", paddingRight: "28px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <h3 style={{ margin: 0 }}>My Cart</h3>
               {cart.length > 0 && (
