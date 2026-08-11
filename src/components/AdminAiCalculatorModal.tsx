@@ -103,9 +103,9 @@ export default function AdminAiCalculatorModal({
   };
 
   /**
-   * Action Handler: Triggers Gemini 3.1 Flash Lite API to extract left-side numbers only
+   * Action Handler: Triggers Gemini 3.1 Flash Lite API to extract right-side numbers only
    */
-  const handleCalculateLeftNumbers = async () => {
+  const handleCalculateRightNumbers = async () => {
     if (!selectedImage) {
       toast.error("Please upload or take a photo first");
       return;
@@ -122,9 +122,9 @@ export default function AdminAiCalculatorModal({
         setItems(result.items);
         setTotalSum(result.totalSum);
         setReplyText(result.reply);
-        toast.success(`Total Left-Side Sum: ₱${result.totalSum.toFixed(2)}`);
+        toast.success(`Total Right-Side Sum: ₱${result.totalSum.toFixed(2)}`);
       } else {
-        toast.error(result.reply || "Failed to calculate left-side numbers");
+        toast.error(result.reply || "Failed to calculate right-side numbers");
       }
     } catch (err: any) {
       toast.error(err.message || "Error processing image calculation");
@@ -159,7 +159,7 @@ export default function AdminAiCalculatorModal({
             </div>
             <div>
               <h3 className="font-bold text-sm leading-tight">AI Photo Calculator</h3>
-              <p className="text-[11px] text-teal-100 font-medium">Sums numbers on the left side of your photo</p>
+              <p className="text-[11px] text-teal-100 font-medium">Sums numbers on the right side of your photo</p>
             </div>
           </div>
           <button
@@ -194,7 +194,7 @@ export default function AdminAiCalculatorModal({
                 Upload or Take Photo of Prices / Receipt
               </p>
               <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
-                AI will scan and calculate numbers listed on the <strong className="text-teal-600 dark:text-teal-400">LEFT side</strong>
+                AI will scan and calculate numbers listed on the <strong className="text-teal-600 dark:text-teal-400">RIGHT side</strong>
               </p>
             </div>
           ) : (
@@ -218,19 +218,19 @@ export default function AdminAiCalculatorModal({
               {/* Action Trigger Button */}
               {items.length === 0 && (
                 <Button
-                  onClick={handleCalculateLeftNumbers}
+                  onClick={handleCalculateRightNumbers}
                   disabled={isLoading}
                   className="w-full bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-bold text-xs py-2.5 rounded-xl shadow-md transition-colors cursor-pointer flex items-center justify-center gap-2"
                 >
                   {isLoading ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      Scanning left-side numbers...
+                      Scanning right-side numbers...
                     </>
                   ) : (
                     <>
                       <Calculator className="w-4 h-4" />
-                      Calculate Left-Side Numbers
+                      Calculate Right-Side Numbers
                     </>
                   )}
                 </Button>
@@ -245,14 +245,14 @@ export default function AdminAiCalculatorModal({
               <div className="p-3 bg-teal-50/60 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-900 rounded-xl space-y-2">
                 <div className="flex items-center justify-between border-b border-teal-200/60 dark:border-teal-900/60 pb-2">
                   <span className="text-xs font-bold text-teal-700 dark:text-teal-300 flex items-center gap-1">
-                    <CheckCircle2 className="w-4 h-4 text-teal-600" /> Left-Side Numbers Extracted
+                    <CheckCircle2 className="w-4 h-4 text-teal-600" /> Right-Side Numbers Extracted
                   </span>
                   <span className="text-[10px] bg-teal-600 text-white font-bold px-2 py-0.5 rounded-full">
                     {items.length} entries
                   </span>
                 </div>
 
-                {/* Left-side items list breakdown */}
+                {/* Right-side items list breakdown */}
                 <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
                   {items.map((item, idx) => (
                     <div
@@ -271,7 +271,7 @@ export default function AdminAiCalculatorModal({
 
                 {/* Grand Total Display */}
                 <div className="pt-2 border-t border-teal-300 dark:border-teal-800 flex items-center justify-between font-extrabold text-sm text-zinc-900 dark:text-zinc-100">
-                  <span>Grand Total (Left Side):</span>
+                  <span>Grand Total (Right Side):</span>
                   <span className="text-teal-600 dark:text-teal-400 text-lg">
                     ₱{totalSum.toFixed(2)}
                   </span>

@@ -532,20 +532,20 @@ export async function processAiCalculatorAction(payload: {
 You are a precise AI visual calculator assistant for Growsary.
 Your task is to analyze the provided image (written price lists, receipts, store tally sheets, or item price tags).
 
-CRITICAL RULE - LEFT SIDE NUMBERS ONLY:
+CRITICAL RULE - RIGHT SIDE NUMBERS ONLY:
 - Carefully inspect the image layout.
-- Locate and extract ONLY the numbers or price amounts that are positioned on the LEFT side of the document / photo / line items.
-- Ignore numbers or text on the right side unless they are clearly part of the left-aligned price list.
-- Extract each left-side number as a price item.
+- Locate and extract ONLY the numbers or price amounts that are positioned on the RIGHT side of the document / photo / line items (e.g. rightmost column prices, totals, or item amounts listed on the right side).
+- Ignore numbers or text on the left side unless they are directly needed to label the right-side price entry.
+- Extract each right-side number as a price item.
 
 Output Format:
 Respond strictly with a JSON object in this format:
 {
   "success": true,
-  "reply": "Friendly summary of numbers extracted from the left side of the photo",
+  "reply": "Friendly summary of numbers extracted from the right side of the photo",
   "items": [
-    { "name": "Left Entry 1", "price": 45 },
-    { "name": "Left Entry 2", "price": 120 }
+    { "name": "Right Entry 1", "price": 45 },
+    { "name": "Right Entry 2", "price": 120 }
   ],
   "totalSum": 165.00
 }
@@ -561,7 +561,7 @@ Respond strictly with a JSON object in this format:
             data: payload.imageBase64,
           },
         },
-        { text: "Extract ONLY the numbers/prices on the LEFT side of this image and compute their grand total sum." },
+        { text: "Extract ONLY the numbers/prices on the RIGHT side of this image and compute their grand total sum." },
       ],
       config: {
         systemInstruction,
