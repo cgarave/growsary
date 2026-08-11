@@ -14,14 +14,33 @@ export interface ParsedProductItem {
   categoryName?: string;
 }
 
+export interface ProductVariantPriceItem {
+  id: string;
+  label: string;
+  retailPrice: number;
+  wholesalePrice: number;
+}
+
 export interface ParsedProductAI {
-  action: "confirm_product" | "confirm_multiple" | "create_product" | "missing_info";
+  action: "confirm_product" | "confirm_multiple" | "confirm_price_update" | "create_product" | "update_price_success" | "missing_info";
   reply: string;
   categoryName?: string;
   isNewCategory?: boolean;
   product?: ParsedProductItem;
   multipleProducts?: ParsedProductItem[];
   detectedMode?: "single_with_variants" | "multiple_single_items";
+  updateTarget?: {
+    productId: string;
+    productName: string;
+    brand?: string;
+    categoryName: string;
+    variants: ProductVariantPriceItem[];
+    suggestedNewPrices?: {
+      targetVariantLabel?: string;
+      newRetailPrice?: number;
+      newWholesalePrice?: number;
+    };
+  };
 }
 
 export async function processAiProductMessageAction(payload: {
@@ -38,7 +57,9 @@ export async function processAiProductMessageAction(payload: {
 
   const existingCategoryNames = categories.map((c) => c.name);
 
-  // Direct execution action if confirmed by user
+  // ---------------------------------------------------------------------------
+  // Action Handler 1: Direct Execution for Creating a Single Product
+  // ---------------------------------------------------------------------------
   if (payload.message.startsWith("EXECUTE_PRODUCT_CREATE:")) {
     try {
       const rawJson = payload.message.replace("EXECUTE_PRODUCT_CREATE:", "");
@@ -91,7 +112,9 @@ export async function processAiProductMessageAction(payload: {
     }
   }
 
-  // Direct execution action for multiple items/variants confirmed by user
+  // ---------------------------------------------------------------------------
+  // Action Handler 2: Direct Execution for Creating Multiple Products/Variants
+  // ---------------------------------------------------------------------------
   if (payload.message.startsWith("EXECUTE_MULTIPLE_CREATE:")) {
     try {
       const rawJson = payload.message.replace("EXECUTE_MULTIPLE_CREATE:", "");
@@ -186,6 +209,88 @@ export async function processAiProductMessageAction(payload: {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Action Handler 3: Direct Execution for Updating Selected Variant Prices
+  // ---------------------------------------------------------------------------
+  if (payload.message.startsWith("EXECUTE_PRICE_UPDATE:")) {
+    try {
+      const rawJson = payload.message.replace("EXECUTE_PRICE_UPDATE:", "");
+      const updateData: {
+        productId: string;
+        variantUpdates: Array<{
+          variantId: string;
+          updateRetail: boolean;
+          updateWholesale: boolean;
+          newRetailPrice?: number;
+          newWholesalePrice?: number;
+        }>;
+      } = JSON.parse(rawJson);
+
+      let updatedCount = 0;
+
+      for (const update of updateData.variantUpdates) {
+        if (!update.updateRetail && !update.updateWholesale) continue;
+
+        if (update.updateRetail && update.newRetailPrice !== undefined) {
+          const retailPriceObj = await prisma.price.findFirst({
+            where: { variantId: update.variantId, type: "RETAIL" },
+          });
+
+          if (retailPriceObj) {
+            await prisma.price.update({
+              where: { id: retailPriceObj.id },
+              data: { amount: update.newRetailPrice },
+            });
+          } else {
+            await prisma.price.create({
+              data: {
+                variantId: update.variantId,
+                type: "RETAIL",
+                amount: update.newRetailPrice,
+              },
+            });
+          }
+        }
+
+        if (update.updateWholesale && update.newWholesalePrice !== undefined) {
+          const wholesalePriceObj = await prisma.price.findFirst({
+            where: { variantId: update.variantId, type: "WHOLESALE" },
+          });
+
+          if (wholesalePriceObj) {
+            await prisma.price.update({
+              where: { id: wholesalePriceObj.id },
+              data: { amount: update.newWholesalePrice },
+            });
+          } else {
+            await prisma.price.create({
+              data: {
+                variantId: update.variantId,
+                type: "WHOLESALE",
+                amount: update.newWholesalePrice,
+              },
+            });
+          }
+        }
+
+        updatedCount++;
+      }
+
+      revalidateTag("catalog", "max");
+      revalidatePath("/", "layout");
+
+      return {
+        action: "update_price_success",
+        reply: `✅ Successfully updated prices for ${updatedCount} variant(s)!`,
+      };
+    } catch (e: any) {
+      return {
+        action: "missing_info",
+        reply: `Failed to update variant prices: ${e.message || "Invalid payload"}`,
+      };
+    }
+  }
+
   // Fallback check if API key is not configured
   if (!apiKey || apiKey === "your_gemini_api_key_here") {
     return {
@@ -197,27 +302,33 @@ export async function processAiProductMessageAction(payload: {
 
   const ai = new GoogleGenAI({ apiKey });
 
+  // System instruction for intent classification & extraction
   const systemInstruction = `
 You are an intelligent store inventory assistant for Growsary.
-Your task is to analyze user text messages and/or uploaded product images (receipts, price tags, packaging photos, written notes, store price lists) to extract product information for store catalog entry.
+Your task is to analyze user text messages and/or uploaded product images (receipts, price tags, packaging photos, written notes, store price lists) to extract product details OR detect intent to update existing item prices.
 
 Existing Store Categories:
 ${JSON.stringify(existingCategoryNames)}
 
 Extraction Guidelines:
-1. Price Equalization Rule:
-   - When an image or text contains a product name and a single price value, set BOTH "retailPrice" and "wholesalePrice" to that exact price value unless separate retail and wholesale prices are explicitly specified.
+1. Intent Classification:
+   - "update_price": User wants to update/change/adjust the retail or wholesale price of an existing product (e.g. "update Coca-Cola 1.5L price to 70", "change retail price of Sprite", "update price for Royal").
+   - "add_product": User wants to add new product(s) or upload a photo/receipt of new inventory.
 
-2. Multiple Products Inspection:
-   - Carefully inspect the image or text to see if there are multiple products listed (e.g., price lists with item names on the right and prices on the left/right, receipts, written price sheets).
-   - If multiple product entries or sizes are detected, extract all of them into the "multipleProducts" array.
+2. Price Equalization Rule (for add_product):
+   - When an image or text contains a product name and a single price value, set BOTH "retailPrice" and "wholesalePrice" to that exact price value unless separate retail and wholesale prices are explicitly specified.
 
 3. Output Format:
 Respond strictly with a JSON object in this format:
 {
+  "intent": "update_price" | "add_product",
   "status": "success" | "missing_info",
-  "hasMultiple": boolean,
-  "reply": "Friendly summary of what was extracted from the image/text.",
+  "targetProductName"?: string,
+  "targetVariantLabel"?: string,
+  "newRetailPrice"?: number,
+  "newWholesalePrice"?: number,
+  "hasMultiple"?: boolean,
+  "reply"?: string,
   "product"?: {
     "name": string,
     "brand": string | null,
@@ -237,8 +348,6 @@ Respond strictly with a JSON object in this format:
     "categoryName": string
   }>
 }
-
-- If critical info (Product Name or Price) is missing, set status to "missing_info" and explain what is missing in "reply".
 `;
 
   try {
@@ -267,6 +376,68 @@ Respond strictly with a JSON object in this format:
     const responseText = response.text || "{}";
     const parsed = JSON.parse(responseText);
 
+    // ---------------------------------------------------------------------------
+    // Path A: User wants to UPDATE an existing item's variant price
+    // ---------------------------------------------------------------------------
+    if (parsed.intent === "update_price" || payload.message.toLowerCase().includes("update price") || payload.message.toLowerCase().includes("change price")) {
+      const searchName = parsed.targetProductName || payload.message.replace(/update|price|change|to|for/gi, "").trim();
+
+      // Find matching products in database
+      const matchedProducts = await prisma.product.findMany({
+        where: {
+          name: { contains: searchName, mode: "insensitive" },
+        },
+        include: {
+          category: true,
+          variants: {
+            include: {
+              prices: true,
+            },
+          },
+        },
+        take: 3,
+      });
+
+      if (matchedProducts.length === 0) {
+        return {
+          action: "missing_info",
+          reply: `I couldn't find any existing product matching **"${searchName}"** in your store catalog. Please check the product name or add it as a new item.`,
+        };
+      }
+
+      const targetProd = matchedProducts[0];
+      const variantsWithPrices: ProductVariantPriceItem[] = targetProd.variants.map((v) => {
+        const retail = Number(v.prices.find((p) => p.type === "RETAIL")?.amount || 0);
+        const wholesale = Number(v.prices.find((p) => p.type === "WHOLESALE")?.amount || 0);
+        return {
+          id: v.id,
+          label: v.label,
+          retailPrice: retail,
+          wholesalePrice: wholesale,
+        };
+      });
+
+      return {
+        action: "confirm_price_update",
+        reply: `I found **${targetProd.name}** under **${targetProd.category.name}**. Select which variant and price type (retail or wholesale) you'd like to update:`,
+        updateTarget: {
+          productId: targetProd.id,
+          productName: targetProd.name,
+          brand: targetProd.brand || undefined,
+          categoryName: targetProd.category.name,
+          variants: variantsWithPrices,
+          suggestedNewPrices: {
+            targetVariantLabel: parsed.targetVariantLabel,
+            newRetailPrice: parsed.newRetailPrice,
+            newWholesalePrice: parsed.newWholesalePrice,
+          },
+        },
+      };
+    }
+
+    // ---------------------------------------------------------------------------
+    // Path B: User wants to ADD new product(s)
+    // ---------------------------------------------------------------------------
     if (parsed.status === "missing_info" || (!parsed.product?.name && (!parsed.multipleProducts || parsed.multipleProducts.length === 0))) {
       return {
         action: "missing_info",

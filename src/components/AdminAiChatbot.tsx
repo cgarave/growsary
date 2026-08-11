@@ -18,6 +18,26 @@ interface MessageItem {
   multipleConfirmationCard?: {
     items: ParsedProductItem[];
   };
+  /**
+   * Price Update Confirmation Card State
+   * Holds the product, its variants, checkbox selections for retail/wholesale update, and input prices.
+   */
+  priceUpdateCard?: {
+    productId: string;
+    productName: string;
+    brand?: string;
+    categoryName: string;
+    variantSelections: Array<{
+      variantId: string;
+      label: string;
+      currentRetail: number;
+      currentWholesale: number;
+      updateRetail: boolean;
+      updateWholesale: boolean;
+      newRetailPrice: number;
+      newWholesalePrice: number;
+    }>;
+  };
 }
 
 interface AdminAiChatbotProps {
@@ -30,7 +50,7 @@ export default function AdminAiChatbot({ existingCategories }: AdminAiChatbotPro
     {
       id: "welcome",
       sender: "ai",
-      text: "👋 Hi Admin! I can help you add products instantly. Describe the product (name, brand, prices, size/variant) or upload a photo/receipt of the item!",
+      text: "👋 Hi Admin! I can help you add products instantly or update prices for existing variants. Try uploading a photo or typing 'update price of Coca-Cola'!",
     },
   ]);
   const [inputText, setInputText] = useState("");
@@ -94,12 +114,20 @@ export default function AdminAiChatbot({ existingCategories }: AdminAiChatbotPro
     reader.readAsDataURL(file);
   };
 
+  /**
+   * Core AI Message Handler
+   * Sends user prompt/image to server action and renders corresponding interactive confirmation cards.
+   */
   const handleSendMessage = async (customMessage?: string) => {
     const textToSend = customMessage !== undefined ? customMessage : inputText;
     if (!textToSend.trim() && !selectedImage) return;
 
     const userMsgId = `usr-${Date.now()}`;
-    if (!customMessage?.startsWith("EXECUTE_PRODUCT_CREATE:") && !customMessage?.startsWith("EXECUTE_MULTIPLE_CREATE:")) {
+    if (
+      !customMessage?.startsWith("EXECUTE_PRODUCT_CREATE:") &&
+      !customMessage?.startsWith("EXECUTE_MULTIPLE_CREATE:") &&
+      !customMessage?.startsWith("EXECUTE_PRICE_UPDATE:")
+    ) {
       const userMessage: MessageItem = {
         id: userMsgId,
         sender: "user",
@@ -128,20 +156,54 @@ export default function AdminAiChatbot({ existingCategories }: AdminAiChatbotPro
         text: result.reply,
       };
 
+      // 1. Single Product Addition Confirmation
       if (result.action === "confirm_product" && result.product) {
         aiMsg.confirmationCard = {
           product: result.product,
           isEditing: false,
         };
-      } else if (result.action === "confirm_multiple" && result.multipleProducts) {
+      }
+      // 2. Multi-Product / Variant Choice Confirmation
+      else if (result.action === "confirm_multiple" && result.multipleProducts) {
         aiMsg.multipleConfirmationCard = {
           items: result.multipleProducts,
+        };
+      }
+      // 3. Price Update Intent Confirmation with Checkbox Selections
+      else if (result.action === "confirm_price_update" && result.updateTarget) {
+        const target = result.updateTarget;
+        const suggestedRetail = target.suggestedNewPrices?.newRetailPrice;
+        const suggestedWholesale = target.suggestedNewPrices?.newWholesalePrice;
+
+        aiMsg.priceUpdateCard = {
+          productId: target.productId,
+          productName: target.productName,
+          brand: target.brand,
+          categoryName: target.categoryName,
+          variantSelections: target.variants.map((v) => {
+            const isSuggestedTarget =
+              !target.suggestedNewPrices?.targetVariantLabel ||
+              v.label.toLowerCase().includes(target.suggestedNewPrices.targetVariantLabel.toLowerCase());
+
+            return {
+              variantId: v.id,
+              label: v.label,
+              currentRetail: v.retailPrice,
+              currentWholesale: v.wholesalePrice,
+              updateRetail: isSuggestedTarget && suggestedRetail !== undefined,
+              updateWholesale: isSuggestedTarget && suggestedWholesale !== undefined,
+              newRetailPrice: (isSuggestedTarget && suggestedRetail !== undefined) ? suggestedRetail : v.retailPrice,
+              newWholesalePrice: (isSuggestedTarget && suggestedWholesale !== undefined) ? suggestedWholesale : v.wholesalePrice,
+            };
+          }),
         };
       }
 
       setMessages((prev) => [...prev, aiMsg]);
       if (result.action === "create_product") {
         toast.success("Product added by AI!");
+      } else if (result.action === "update_price_success") {
+        toast.success("Variant prices updated!");
       }
     } catch (err: any) {
       setMessages((prev) => [
@@ -160,7 +222,6 @@ export default function AdminAiChatbot({ existingCategories }: AdminAiChatbotPro
 
   const handleConfirmAndAddSingle = (msgId: string, product: ParsedProductItem) => {
     const execMessage = `EXECUTE_PRODUCT_CREATE:${JSON.stringify(product)}`;
-    // Clear action card
     setMessages((prev) =>
       prev.map((m) => (m.id === msgId ? { ...m, confirmationCard: undefined } : m))
     );
@@ -171,11 +232,11 @@ export default function AdminAiChatbot({ existingCategories }: AdminAiChatbotPro
     setMessages((prev) =>
       prev.map((m) =>
         m.id === msgId
-          ? { ...m, confirmationCard: undefined, multipleConfirmationCard: undefined }
+          ? { ...m, confirmationCard: undefined, multipleConfirmationCard: undefined, priceUpdateCard: undefined }
           : m
       )
     );
-    toast.info("Cancelled product addition.");
+    toast.info("Cancelled action.");
   };
 
   const handleToggleEditMode = (msgId: string) => {
@@ -228,6 +289,67 @@ export default function AdminAiChatbot({ existingCategories }: AdminAiChatbotPro
     setMessages((prev) =>
       prev.map((m) => (m.id === msgId ? { ...m, multipleConfirmationCard: undefined } : m))
     );
+    handleSendMessage(execMessage);
+  };
+
+  /**
+   * Helper Handler: Update Checkbox & Input State for Price Update Confirmation Card
+   */
+  const handleTogglePriceUpdateField = (
+    msgId: string,
+    variantId: string,
+    field: "updateRetail" | "updateWholesale" | "newRetailPrice" | "newWholesalePrice",
+    value: any
+  ) => {
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.id === msgId && m.priceUpdateCard) {
+          return {
+            ...m,
+            priceUpdateCard: {
+              ...m.priceUpdateCard,
+              variantSelections: m.priceUpdateCard.variantSelections.map((v) =>
+                v.variantId === variantId ? { ...v, [field]: value } : v
+              ),
+            },
+          };
+        }
+        return m;
+      })
+    );
+  };
+
+  /**
+   * Execution Handler: Submits Price Update Confirmation to Backend Action
+   */
+  const handleExecutePriceUpdate = (msgId: string, card: NonNullable<MessageItem["priceUpdateCard"]>) => {
+    const updatesToPerform = card.variantSelections.filter(
+      (v) => v.updateRetail || v.updateWholesale
+    );
+
+    if (updatesToPerform.length === 0) {
+      toast.error("Please check at least one price (retail or wholesale) to update.");
+      return;
+    }
+
+    const payloadObj = {
+      productId: card.productId,
+      variantUpdates: updatesToPerform.map((v) => ({
+        variantId: v.variantId,
+        updateRetail: v.updateRetail,
+        updateWholesale: v.updateWholesale,
+        newRetailPrice: v.newRetailPrice,
+        newWholesalePrice: v.newWholesalePrice,
+      })),
+    };
+
+    const execMessage = `EXECUTE_PRICE_UPDATE:${JSON.stringify(payloadObj)}`;
+
+    // Clear card UI after submission
+    setMessages((prev) =>
+      prev.map((m) => (m.id === msgId ? { ...m, priceUpdateCard: undefined } : m))
+    );
+
     handleSendMessage(execMessage);
   };
 
@@ -360,7 +482,131 @@ export default function AdminAiChatbot({ existingCategories }: AdminAiChatbotPro
                     )}
                     <div style={{ whiteSpace: "pre-line" }}>{msg.text}</div>
 
-                    {/* Single Product Confirmation Card */}
+                    {/* Price Update Confirmation Card (Styled with Tailwind CSS) */}
+                    {msg.priceUpdateCard && (
+                      <div className="mt-2.5 p-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm space-y-3">
+                        {/* Header details */}
+                        <div className="border-b border-zinc-100 dark:border-zinc-800 pb-2">
+                          <div className="text-xs font-bold text-teal-600 dark:text-teal-400">
+                            🏷️ Price Update Confirmation
+                          </div>
+                          <div className="text-xs text-zinc-700 dark:text-zinc-300 font-medium">
+                            {msg.priceUpdateCard.productName}
+                            {msg.priceUpdateCard.brand && <span className="text-zinc-400 font-normal"> ({msg.priceUpdateCard.brand})</span>}
+                          </div>
+                          <div className="text-[10px] text-zinc-400">
+                            Category: {msg.priceUpdateCard.categoryName}
+                          </div>
+                        </div>
+
+                        {/* Variants List with Checkboxes and Inputs */}
+                        <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                          {msg.priceUpdateCard.variantSelections.map((v) => (
+                            <div
+                              key={v.variantId}
+                              className="p-2 bg-zinc-50 dark:bg-zinc-850 border border-zinc-200/80 dark:border-zinc-800 rounded-lg text-xs space-y-1.5"
+                            >
+                              <div className="font-semibold text-zinc-800 dark:text-zinc-200 flex justify-between items-center">
+                                <span>{v.label}</span>
+                                <span className="text-[10px] text-zinc-400">
+                                  Current: ₱{v.currentRetail} R / ₱{v.currentWholesale} W
+                                </span>
+                              </div>
+
+                              {/* Checkbox 1: Retail Price */}
+                              <div className="flex items-center gap-2 pt-0.5">
+                                <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-medium text-zinc-700 dark:text-zinc-300 select-none">
+                                  <input
+                                    type="checkbox"
+                                    checked={v.updateRetail}
+                                    onChange={(e) =>
+                                      handleTogglePriceUpdateField(
+                                        msg.id,
+                                        v.variantId,
+                                        "updateRetail",
+                                        e.target.checked
+                                      )
+                                    }
+                                    className="rounded border-zinc-300 text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
+                                  />
+                                  <span>Retail Price (₱)</span>
+                                </label>
+                                {v.updateRetail && (
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={v.newRetailPrice}
+                                    onChange={(e) =>
+                                      handleTogglePriceUpdateField(
+                                        msg.id,
+                                        v.variantId,
+                                        "newRetailPrice",
+                                        parseFloat(e.target.value) || 0
+                                      )
+                                    }
+                                    className="ml-auto w-20 px-2 py-0.5 text-xs bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded focus:outline-none focus:border-teal-500"
+                                  />
+                                )}
+                              </div>
+
+                              {/* Checkbox 2: Wholesale Price */}
+                              <div className="flex items-center gap-2">
+                                <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-medium text-zinc-700 dark:text-zinc-300 select-none">
+                                  <input
+                                    type="checkbox"
+                                    checked={v.updateWholesale}
+                                    onChange={(e) =>
+                                      handleTogglePriceUpdateField(
+                                        msg.id,
+                                        v.variantId,
+                                        "updateWholesale",
+                                        e.target.checked
+                                      )
+                                    }
+                                    className="rounded border-zinc-300 text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
+                                  />
+                                  <span>Wholesale Price (₱)</span>
+                                </label>
+                                {v.updateWholesale && (
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={v.newWholesalePrice}
+                                    onChange={(e) =>
+                                      handleTogglePriceUpdateField(
+                                        msg.id,
+                                        v.variantId,
+                                        "newWholesalePrice",
+                                        parseFloat(e.target.value) || 0
+                                      )
+                                    }
+                                    className="ml-auto w-20 px-2 py-0.5 text-xs bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded focus:outline-none focus:border-teal-500"
+                                  />
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Action Buttons: Confirm & Cancel */}
+                        <div className="flex gap-2 pt-1 border-t border-zinc-100 dark:border-zinc-800">
+                          <button
+                            type="button"
+                            onClick={() => handleExecutePriceUpdate(msg.id, msg.priceUpdateCard!)}
+                            className="flex-1 py-1.5 px-3 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white text-xs font-bold rounded-md shadow-sm transition-colors cursor-pointer"
+                          >
+                            Confirm Price Update
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleCancelCard(msg.id)}
+                            className="py-1.5 px-3 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 text-xs font-semibold rounded-md transition-colors cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
                     {msg.confirmationCard && (
                       <div style={{ marginTop: "10px", background: "var(--paper)", border: "1px solid var(--line)", borderRadius: "10px", padding: "10px" }}>
                         {!msg.confirmationCard.isEditing ? (
