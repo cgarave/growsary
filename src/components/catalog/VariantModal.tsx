@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { X } from "lucide-react";
 import { CatalogProduct } from "@/app/actions";
 import { PriceMode, CATEGORY_EMOJIS, CartItem } from "./types";
 
@@ -84,8 +85,30 @@ export default function VariantModal({
 
   return (
     <div className="overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal">
-        <div className="vm-header">
+      <div className="modal relative">
+        <button
+          onClick={onClose}
+          className="modal-close-btn"
+          title="Close modal"
+          aria-label="Close"
+          style={{
+            position: "absolute",
+            top: "16px",
+            right: "16px",
+            background: "none",
+            border: "none",
+            color: "var(--muted)",
+            cursor: "pointer",
+            padding: "4px",
+            borderRadius: "6px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <X width="18" height="18" />
+        </button>
+        <div className="vm-header" style={{ paddingRight: "32px" }}>
           <div className="vm-thumb">
             {CATEGORY_EMOJIS[product.categoryName] || "🥤"}
           </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef } from "react";
-import { Trash2, Download, RotateCcw } from "lucide-react";
+import { Trash2, Download, RotateCcw, X } from "lucide-react";
 import { toPng } from "html-to-image";
 import { toast } from "sonner";
 import { CartItem } from "./types";
@@ -68,12 +68,32 @@ export default function CartModal({
       <div className="modal" style={{ maxWidth: "480px", width: "100%" }}>
         <div ref={cartRef} style={{ background: "var(--paper)", padding: "16px", borderRadius: "12px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-            <h3 style={{ margin: 0 }}>My Cart</h3>
-            {cart.length > 0 && (
-              <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--muted)", fontFamily: "monospace" }}>
-                {totalCartCount} item(s)
-              </span>
-            )}
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <h3 style={{ margin: 0 }}>My Cart</h3>
+              {cart.length > 0 && (
+                <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--muted)", fontFamily: "monospace" }}>
+                  ({totalCartCount} item(s))
+                </span>
+              )}
+            </div>
+            <button
+              onClick={onClose}
+              title="Close cart"
+              aria-label="Close"
+              style={{
+                background: "none",
+                border: "none",
+                color: "var(--muted)",
+                cursor: "pointer",
+                padding: "4px",
+                borderRadius: "6px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <X width="18" height="18" />
+            </button>
           </div>
           <div className="sub" style={{ marginBottom: "16px" }}>
             Review your items, then send your order to us on Messenger or save your cart image.
