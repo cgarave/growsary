@@ -22,7 +22,7 @@ export default function CategoryFilterBar({
   onDeleteCategory,
 }: CategoryFilterBarProps) {
   return (
-    <div className="flex flex-row gap-x-2 p-4">
+    <div className="flex flex-row gap-x-2 p-4 overflow-x-scroll">
       <div
         className={`chip ${selectedCategory === "All" ? "active" : ""}`}
         onClick={() => onSelectCategory("All")}
