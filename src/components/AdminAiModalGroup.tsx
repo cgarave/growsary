@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useState, useRef } from "react";
-import { Sparkles, Calculator, X, Upload, Download, RefreshCw, CheckCircle2, Loader2, Bot, Send, Image as ImageIcon } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
+import { Sparkles, Calculator, X, Upload, RefreshCw, CheckCircle2, Loader2, Send, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
-import { toPng } from "html-to-image";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Message, MessageContent, MessageAvatar, MessageScroller } from "@/components/ui/message";
@@ -43,12 +42,17 @@ interface AdminAiModalGroupProps {
   existingCategories: string[];
 }
 
+/** LocalStorage key for persisting calculator state */
+const CALCULATOR_STORAGE_KEY = "growsary_admin_calculator_state";
+
 /**
  * Unified Admin AI Modal Group Component
  * 
  * Features:
  * - Single modal with a top Segmented Button Group to toggle between AI Chatbot and AI Calculator modes.
  * - Uses ShadCN Message, MessageContent, MessageAvatar, and MessageScroller components.
+ * - Persistent Calculator Results: Persisted in localStorage (`growsary_admin_calculator_state`) until Reset is clicked.
+ * - Inline Editable Item Prices: Admins can dynamically edit parsed price values or names, automatically re-calculating total sum.
  * - Styled 100% strictly with Tailwind CSS.
  * - Fully documented with comments for code review.
  */
@@ -72,15 +76,59 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
   const chatFileInputRef = useRef<HTMLInputElement>(null);
 
   // ---------------------------------------------------------------------------
-  // AI Calculator State & Logic
+  // AI Calculator State & Logic (With LocalStorage Persistence & Dynamic Price Editing)
   // ---------------------------------------------------------------------------
   const [calcSelectedImage, setCalcSelectedImage] = useState<{ base64: string; mimeType: string; previewUrl: string } | null>(null);
   const [isCalcLoading, setIsCalcLoading] = useState(false);
-  const [isCapturingScreenshot, setIsCapturingScreenshot] = useState(false);
   const [calcItems, setCalcItems] = useState<CalculatorItem[]>([]);
   const [calcTotalSum, setCalcTotalSum] = useState<number>(0);
   const calcFileInputRef = useRef<HTMLInputElement>(null);
-  const calcCardRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Load Persisted Calculator State from LocalStorage on Component Mount
+   */
+  useEffect(() => {
+    try {
+      const savedStateStr = localStorage.getItem(CALCULATOR_STORAGE_KEY);
+      if (savedStateStr) {
+        const saved = JSON.parse(savedStateStr);
+        if (saved.calcItems && Array.isArray(saved.calcItems)) {
+          setCalcItems(saved.calcItems);
+        }
+        if (typeof saved.calcTotalSum === "number") {
+          setCalcTotalSum(saved.calcTotalSum);
+        }
+        if (saved.calcSelectedImage) {
+          setCalcSelectedImage(saved.calcSelectedImage);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load calculator state from localStorage:", e);
+    }
+  }, []);
+
+  /**
+   * Auto-compute total sum whenever items array changes & save to LocalStorage
+   */
+  useEffect(() => {
+    const computedTotal = calcItems.reduce((acc, item) => acc + (Number(item.price) || 0) * (item.qty || 1), 0);
+    setCalcTotalSum(computedTotal);
+
+    if (calcItems.length > 0 || calcSelectedImage) {
+      try {
+        localStorage.setItem(
+          CALCULATOR_STORAGE_KEY,
+          JSON.stringify({
+            calcItems,
+            calcTotalSum: computedTotal,
+            calcSelectedImage,
+          })
+        );
+      } catch (e) {
+        console.error("Failed to save calculator state to localStorage:", e);
+      }
+    }
+  }, [calcItems, calcSelectedImage]);
 
   // ---------------------------------------------------------------------------
   // Chatbot Handlers
@@ -186,7 +234,8 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
         const ctx = canvas.getContext("2d");
         ctx?.drawImage(img, 0, 0, w, h);
         const compressed = canvas.toDataURL("image/jpeg", 0.8);
-        setCalcSelectedImage({ base64: compressed.split(",")[1], mimeType: "image/jpeg", previewUrl: compressed });
+        const newImgState = { base64: compressed.split(",")[1], mimeType: "image/jpeg", previewUrl: compressed };
+        setCalcSelectedImage(newImgState);
         setCalcItems([]);
         setCalcTotalSum(0);
       };
@@ -222,20 +271,34 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
     }
   };
 
-  const handleSaveCalcScreenshot = async () => {
-    if (!calcCardRef.current) return;
-    setIsCapturingScreenshot(true);
+  /**
+   * Inline Edit Handler: Allows editing price or name of parsed calculator items
+   * Automatically triggers recalculation of total sum via useEffect.
+   */
+  const handleItemFieldChange = (index: number, field: "name" | "price", value: string | number) => {
+    setCalcItems((prev) => {
+      const updated = [...prev];
+      if (field === "price") {
+        updated[index] = { ...updated[index], price: typeof value === "number" ? value : parseFloat(value) || 0 };
+      } else {
+        updated[index] = { ...updated[index], name: String(value) };
+      }
+      return updated;
+    });
+  };
+
+  /**
+   * Reset Handler: Clears calculator state & removes saved state from LocalStorage
+   */
+  const handleResetCalculator = () => {
+    setCalcSelectedImage(null);
+    setCalcItems([]);
+    setCalcTotalSum(0);
     try {
-      const dataUrl = await toPng(calcCardRef.current, { cacheBust: true, backgroundColor: "#ffffff" });
-      const link = document.createElement("a");
-      link.download = `growsary-calculator-${Date.now()}.png`;
-      link.href = dataUrl;
-      link.click();
-      toast.success("Screenshot downloaded!");
-    } catch (err) {
-      toast.error("Failed to capture screenshot");
-    } finally {
-      setIsCapturingScreenshot(false);
+      localStorage.removeItem(CALCULATOR_STORAGE_KEY);
+      toast.info("Calculator reset.");
+    } catch (e) {
+      console.error("Error clearing localStorage:", e);
     }
   };
 
@@ -244,7 +307,7 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
       {/* Trigger Button Component */}
       <Button
         variant="outline"
-        className="border-teal-200 bg-teal-50/60 hover:bg-teal-100/60 text-teal-700 dark:text-teal-300 dark:bg-teal-950 dark:border-teal-900 rounded-[9px] text-xs font-semibold"
+        className="border-teal-200 bg-teal-50/60 hover:bg-teal-100/60 text-teal-700 dark:text-teal-300 dark:bg-teal-950 dark:border-teal-900 rounded-[9px] text-xs font-semibold cursor-pointer"
         onClick={() => setIsOpen(true)}
         title="Growsary AI Hub (Assistant & Photo Calculator)"
       >
@@ -383,7 +446,7 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
                     type="button"
                     onClick={() => handleSendChatMessage()}
                     disabled={isChatLoading || (!inputText.trim() && !chatSelectedImage)}
-                    className="bg-teal-600 hover:bg-teal-700 text-white rounded-xl px-3"
+                    className="bg-teal-600 hover:bg-teal-700 text-white rounded-xl px-3 cursor-pointer"
                   >
                     <Send className="w-3.5 h-3.5" />
                   </Button>
@@ -391,7 +454,7 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
               </div>
             )}
 
-            {/* TAB 2: AI CALCULATOR MODE */}
+            {/* TAB 2: AI CALCULATOR MODE (With LocalStorage Persistence & Inline Price Editing) */}
             {activeTab === "calculator" && (
               <div className="flex-1 flex flex-col p-4 overflow-y-auto space-y-4 bg-zinc-50 dark:bg-zinc-950">
                 <input
@@ -402,7 +465,7 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
                   className="hidden"
                 />
 
-                <div ref={calcCardRef} className="space-y-4">
+                <div className="space-y-4 flex-1">
                   {!calcSelectedImage ? (
                     <div
                       onClick={() => calcFileInputRef.current?.click()}
@@ -421,10 +484,11 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
                   ) : (
                     <div className="space-y-3">
                       <div className="relative rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-950">
-                        <img src={calcSelectedImage.previewUrl} alt="Prices list" className="w-full max-h-44 object-contain" />
+                        <img src={calcSelectedImage.previewUrl} alt="Prices list" className="w-full max-h-40 object-contain" />
                         <button
-                          onClick={() => { setCalcSelectedImage(null); setCalcItems([]); setCalcTotalSum(0); }}
-                          className="absolute top-2 right-2 p-1.5 bg-zinc-900/80 hover:bg-zinc-900 text-white rounded-full"
+                          onClick={handleResetCalculator}
+                          className="absolute top-2 right-2 p-1.5 bg-zinc-900/80 hover:bg-zinc-900 text-white rounded-full cursor-pointer"
+                          title="Clear photo"
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -434,7 +498,7 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
                         <Button
                           onClick={handleCalculateRightNumbers}
                           disabled={isCalcLoading}
-                          className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs py-2.5 rounded-xl flex items-center justify-center gap-2"
+                          className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs py-2.5 rounded-xl flex items-center justify-center gap-2 cursor-pointer"
                         >
                           {isCalcLoading ? (
                             <>
@@ -452,63 +516,61 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
                     </div>
                   )}
 
-                  {/* Calculator Extracted Results Breakdown Card */}
+                  {/* Calculator Extracted Results Breakdown Card with Editable Prices */}
                   {calcItems.length > 0 && (
                     <div className="p-3.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl space-y-2.5 shadow-xs">
                       <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2">
                         <span className="text-xs font-bold text-teal-600 dark:text-teal-400 flex items-center gap-1">
-                          <CheckCircle2 className="w-4 h-4" /> Right-Side Extracted Items
+                          <CheckCircle2 className="w-4 h-4" /> Right-Side Extracted Items (Editable)
                         </span>
                         <span className="text-[10px] bg-teal-600 text-white font-bold px-2 py-0.5 rounded-full">
                           {calcItems.length} entries
                         </span>
                       </div>
 
-                      <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                      {/* Interactive Editable Items List */}
+                      <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                         {calcItems.map((item, idx) => (
-                          <div key={idx} className="flex items-center justify-between text-xs py-1 border-b border-zinc-100 dark:border-zinc-800 last:border-0">
-                            <span className="text-zinc-700 dark:text-zinc-300 font-medium">• {item.name}</span>
-                            <span className="font-bold text-zinc-900 dark:text-zinc-100">₱{item.price.toFixed(2)}</span>
+                          <div key={idx} className="flex items-center justify-between gap-2 text-xs py-1 border-b border-zinc-100 dark:border-zinc-800 last:border-0">
+                            <input
+                              type="text"
+                              value={item.name}
+                              onChange={(e) => handleItemFieldChange(idx, "name", e.target.value)}
+                              className="flex-1 font-medium text-zinc-800 dark:text-zinc-200 bg-transparent border-b border-transparent hover:border-zinc-300 focus:border-teal-500 focus:outline-none px-1 py-0.5 rounded text-xs"
+                            />
+                            <div className="flex items-center gap-1 font-bold text-zinc-900 dark:text-zinc-100">
+                              <span>₱</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={item.price}
+                                onChange={(e) => handleItemFieldChange(idx, "price", parseFloat(e.target.value) || 0)}
+                                className="w-20 text-right font-bold text-zinc-900 dark:text-zinc-100 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded px-1.5 py-0.5 focus:outline-none focus:border-teal-500 text-xs"
+                              />
+                            </div>
                           </div>
                         ))}
                       </div>
 
-                      <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between font-extrabold text-sm text-zinc-900 dark:text-zinc-100">
+                      {/* Dynamic Grand Total Display (Auto Updates on Price Change) */}
+                      <div className="pt-2.5 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between font-extrabold text-sm text-zinc-900 dark:text-zinc-100">
                         <span>Grand Total Sum (Right Side):</span>
-                        <span className="text-teal-600 text-lg">₱{calcTotalSum.toFixed(2)}</span>
+                        <span className="text-teal-600 dark:text-teal-400 text-lg">₱{calcTotalSum.toFixed(2)}</span>
                       </div>
                     </div>
                   )}
                 </div>
 
-                {/* Bottom Calculator Action Footer */}
+                {/* Bottom Calculator Reset Action Footer */}
                 {calcItems.length > 0 && (
-                  <div className="pt-2 flex items-center gap-2">
+                  <div className="pt-2 flex items-center justify-end">
                     <Button
                       variant="outline"
-                      onClick={handleSaveCalcScreenshot}
-                      disabled={isCapturingScreenshot}
-                      className="flex-1 text-xs font-bold border-teal-200 bg-teal-50 hover:bg-teal-100 text-teal-700 dark:text-teal-300 dark:bg-teal-950 dark:border-teal-900 rounded-xl"
+                      onClick={handleResetCalculator}
+                      className="w-full text-xs font-semibold border-zinc-300 rounded-xl cursor-pointer text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
                     >
-                      {isCapturingScreenshot ? (
-                        <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <Download className="w-3.5 h-3.5 mr-1.5 text-teal-600" />
-                          Save as Screenshot
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => { setCalcSelectedImage(null); setCalcItems([]); setCalcTotalSum(0); }}
-                      className="text-xs font-semibold border-zinc-300 rounded-xl"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5 mr-1" />
-                      Reset
+                      <RefreshCw className="w-3.5 h-3.5 mr-1 text-zinc-500" />
+                      Reset Calculator
                     </Button>
                   </div>
                 )}
@@ -521,3 +583,4 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
     </>
   );
 }
+
