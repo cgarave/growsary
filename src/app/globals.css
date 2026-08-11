@@ -566,7 +566,8 @@ main {
   max-width: 480px;
   border-radius: 20px 20px 0 0;
   padding: 24px 20px 30px;
-  height: 85vh;
+  height: fit-content;
+  max-height: 60vh;
   display: flex;
   flex-direction: column;
   box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.18);
