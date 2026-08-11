@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useRef } from "react";
-import { Bot, Send, Image as ImageIcon, X, Loader2, Sparkles } from "lucide-react";
-import { processAiProductMessageAction, ParsedProductAI, ParsedProductItem } from "@/app/ai-actions";
+import { Bot, Send, Image as ImageIcon, X, Loader2, Sparkles, Calculator } from "lucide-react";
+import { processAiProductMessageAction, processAiCalculatorAction, ParsedProductAI, ParsedProductItem, CalculatorResultAI } from "@/app/ai-actions";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button"
 
@@ -38,6 +38,14 @@ interface MessageItem {
       newWholesalePrice: number;
     }>;
   };
+  /**
+   * AI Calculator Mode Result Card State
+   * Holds calculated receipt items and grand total sum.
+   */
+  calculatorCard?: {
+    items: Array<{ name: string; price: number; qty?: number }>;
+    totalSum: number;
+  };
 }
 
 interface AdminAiChatbotProps {
@@ -46,6 +54,7 @@ interface AdminAiChatbotProps {
 
 export default function AdminAiChatbot({ existingCategories }: AdminAiChatbotProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isCalculatorMode, setIsCalculatorMode] = useState(false);
   const [messages, setMessages] = useState<MessageItem[]>([
     {
       id: "welcome",
@@ -58,6 +67,7 @@ export default function AdminAiChatbot({ existingCategories }: AdminAiChatbotPro
   const [isLoading, setIsLoading] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const calculatorFileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -291,6 +301,101 @@ export default function AdminAiChatbot({ existingCategories }: AdminAiChatbotPro
     );
     handleSendMessage(execMessage);
   };
+  /**
+   * AI Calculator Mode Handler
+   * Takes a photo of receipt/prices, sends to processAiCalculatorAction, and appends total sum card.
+   */
+  const handleCalculatorImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select a valid image file for calculator mode.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const img = new Image();
+      img.onload = async () => {
+        const canvas = document.createElement("canvas");
+        const MAX_WIDTH = 1024;
+        const MAX_HEIGHT = 1024;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.8);
+        const base64Data = compressedDataUrl.split(",")[1];
+
+        // 1. Show user message with photo
+        const userMsg: MessageItem = {
+          id: `usr-calc-${Date.now()}`,
+          sender: "user",
+          text: "🧮 Analyzed receipt/item prices from photo:",
+          imagePreview: compressedDataUrl,
+        };
+        setMessages((prev) => [...prev, userMsg]);
+
+        // Open chat window if not open
+        setIsOpen(true);
+        setIsLoading(true);
+        setTimeout(scrollToBottom, 100);
+
+        try {
+          // 2. Call Gemini Calculator Action
+          const calcResult = await processAiCalculatorAction({
+            imageBase64: base64Data,
+            imageMimeType: "image/jpeg",
+          });
+
+          // 3. Append AI response message with calculator result card
+          const aiMsg: MessageItem = {
+            id: `ai-calc-${Date.now()}`,
+            sender: "ai",
+            text: calcResult.reply,
+            calculatorCard: {
+              items: calcResult.items,
+              totalSum: calcResult.totalSum,
+            },
+          };
+
+          setMessages((prev) => [...prev, aiMsg]);
+          toast.success(`Calculated grand total: ₱${calcResult.totalSum.toFixed(2)}`);
+        } catch (err: any) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `err-calc-${Date.now()}`,
+              sender: "ai",
+              text: `Error calculating prices: ${err.message || "Failed to parse receipt prices."}`,
+            },
+          ]);
+        } finally {
+          setIsLoading(false);
+          setTimeout(scrollToBottom, 100);
+        }
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
 
   /**
    * Helper Handler: Update Checkbox & Input State for Price Update Confirmation Card
@@ -355,33 +460,34 @@ export default function AdminAiChatbot({ existingCategories }: AdminAiChatbotPro
 
   return (
     <>
-      {/* AI Assistant Button Component */}
-      {/* <button
-        type="button"
-        className="ai-assistant-btn"
-        onClick={() => setIsOpen((prev) => !prev)}
-        style={{
-          padding: "8px 14px",
-          borderRadius: "9px",
-          background: "linear-gradient(135deg, #6366f1 0%, #a855f7 100%)",
-          color: "#ffffff",
-          border: "none",
-          boxShadow: "0 2px 8px rgba(168, 85, 247, 0.25)",
-          display: "inline-flex",
-          alignItems: "center",
-          gap: "6px",
-          fontSize: "12.5px",
-          fontWeight: 700,
-          cursor: "pointer",
-          whiteSpace: "nowrap",
-          transition: "transform 0.15s ease, opacity 0.15s ease",
-        }}
-      >
-        <Sparkles width="15" height="15" />
-      </button> */}
-      <Button variant="outline" className="border-zinc-300 rounded-[9px] text-xs" onClick={() => setIsOpen((prev) => !prev)}>
-        <Sparkles data-icon="inline-start" />
-      </Button>
+      {/* Hidden File Input for Calculator Mode Photo Upload */}
+      <input
+        type="file"
+        accept="image/*"
+        ref={calculatorFileInputRef}
+        onChange={handleCalculatorImageSelect}
+        style={{ display: "none" }}
+      />
+
+      {/* Admin AI Action Buttons */}
+      <div className="flex items-center gap-1.5">
+        <Button
+          variant="outline"
+          className="border-zinc-300 rounded-[9px] text-xs"
+          onClick={() => setIsOpen((prev) => !prev)}
+          title="AI Store Assistant"
+        >
+          <Sparkles data-icon="inline-start" />
+        </Button>
+        <Button
+          variant="outline"
+          className="border-zinc-300 rounded-[9px] text-xs text-teal-600 border-teal-200 bg-teal-50/50 hover:bg-teal-100/50"
+          onClick={() => calculatorFileInputRef.current?.click()}
+          title="AI Photo Calculator Mode (Upload receipt/price tag to sum total)"
+        >
+          <Calculator data-icon="inline-start" />
+        </Button>
+      </div>
 
       {/* AI Chat Drawer / Modal - Mobile Friendly */}
       {isOpen && (
@@ -481,6 +587,45 @@ export default function AdminAiChatbot({ existingCategories }: AdminAiChatbotPro
                       />
                     )}
                     <div style={{ whiteSpace: "pre-line" }}>{msg.text}</div>
+
+                    {/* AI Calculator Result Card (Styled with Tailwind CSS) */}
+                    {msg.calculatorCard && (
+                      <div className="mt-2.5 p-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm space-y-2.5">
+                        <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2">
+                          <span className="text-xs font-bold text-teal-600 dark:text-teal-400 flex items-center gap-1">
+                            🧮 AI Receipt Calculator
+                          </span>
+                          <span className="text-[10px] bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-300 font-semibold px-2 py-0.5 rounded-full border border-teal-200 dark:border-teal-800">
+                            {msg.calculatorCard.items.length} items parsed
+                          </span>
+                        </div>
+
+                        {/* Line items list */}
+                        <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                          {msg.calculatorCard.items.map((item, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center justify-between text-xs py-1 border-b border-zinc-50 dark:border-zinc-850"
+                            >
+                              <span className="text-zinc-700 dark:text-zinc-300 font-medium">
+                                {item.name} {item.qty && item.qty > 1 ? `(x${item.qty})` : ""}
+                              </span>
+                              <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+                                ₱{(item.price * (item.qty || 1)).toFixed(2)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Total Sum Display */}
+                        <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between font-bold text-sm text-zinc-900 dark:text-zinc-50">
+                          <span>Grand Total Sum:</span>
+                          <span className="text-teal-600 dark:text-teal-400 text-base">
+                            ₱{msg.calculatorCard.totalSum.toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Price Update Confirmation Card (Styled with Tailwind CSS) */}
                     {msg.priceUpdateCard && (

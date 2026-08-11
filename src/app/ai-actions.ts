@@ -489,3 +489,112 @@ Respond strictly with a JSON object in this format:
     };
   }
 }
+
+// -----------------------------------------------------------------------------
+// AI Calculator Mode Server Action
+// -----------------------------------------------------------------------------
+
+export interface CalculatorItem {
+  name: string;
+  price: number;
+  qty?: number;
+}
+
+export interface CalculatorResultAI {
+  success: boolean;
+  reply: string;
+  items: CalculatorItem[];
+  totalSum: number;
+}
+
+/**
+ * Server action that takes an image of receipts, price lists, or items,
+ * uses Gemini to identify all individual prices, and automatically calculates the total sum.
+ */
+export async function processAiCalculatorAction(payload: {
+  imageBase64: string;
+  imageMimeType: string;
+}): Promise<CalculatorResultAI> {
+  const apiKey = process.env.GEMINI_API_KEY;
+
+  if (!apiKey || apiKey === "your_gemini_api_key_here") {
+    return {
+      success: false,
+      reply: "⚠️ `GEMINI_API_KEY` is not configured.",
+      items: [],
+      totalSum: 0,
+    };
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
+
+  const systemInstruction = `
+You are an expert AI inventory & receipt calculator for Growsary.
+Your task is to analyze the provided image (receipt, written list of prices, store price tags, or photos of multiple items with prices).
+
+Extraction Guidelines:
+1. Locate all visible price items in the photo.
+2. For each item, extract:
+   - "name": Brief label or product description (e.g., "Coca-Cola 1.5L", "Item #1", "Bread", "Receipt line item").
+   - "price": Numeric price value (e.g., 65.50).
+   - "qty": Optional quantity integer if specified (default to 1).
+3. Compute the grand total sum of all extracted prices (sum of price * qty).
+
+Output Format:
+Respond strictly with a JSON object in this format:
+{
+  "success": true,
+  "reply": "Friendly summary of the calculated receipt/items",
+  "items": [
+    { "name": "Item 1", "price": 45, "qty": 1 },
+    { "name": "Item 2", "price": 120, "qty": 2 }
+  ],
+  "totalSum": 285.00
+}
+`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3.1-flash-lite",
+      contents: [
+        {
+          inlineData: {
+            mimeType: payload.imageMimeType,
+            data: payload.imageBase64,
+          },
+        },
+        { text: "Calculate all prices shown in this image and sum the total." },
+      ],
+      config: {
+        systemInstruction,
+        responseMimeType: "application/json",
+      },
+    });
+
+    const responseText = response.text || "{}";
+    const parsed = JSON.parse(responseText);
+
+    const items: CalculatorItem[] = (parsed.items || []).map((it: any, idx: number) => ({
+      name: it.name || `Item #${idx + 1}`,
+      price: Number(it.price) || 0,
+      qty: Number(it.qty) || 1,
+    }));
+
+    const computedTotal = items.reduce((acc, it) => acc + it.price * (it.qty || 1), 0);
+
+    return {
+      success: true,
+      reply: parsed.reply || `Calculated ${items.length} items from image.`,
+      items,
+      totalSum: parsed.totalSum !== undefined ? Number(parsed.totalSum) : computedTotal,
+    };
+  } catch (err: any) {
+    console.error("AI Calculator Error:", err);
+    return {
+      success: false,
+      reply: `Error processing image for calculator: ${err.message || "Failed to parse prices."}`,
+      items: [],
+      totalSum: 0,
+    };
+  }
+}
