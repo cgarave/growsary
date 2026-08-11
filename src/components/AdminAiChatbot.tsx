@@ -4,7 +4,8 @@ import React, { useState, useRef } from "react";
 import { Bot, Send, Image as ImageIcon, X, Loader2, Sparkles } from "lucide-react";
 import { processAiProductMessageAction, ParsedProductAI, ParsedProductItem } from "@/app/ai-actions";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button";
+import { Message, MessageContent, MessageAvatar, MessageScroller } from "@/components/ui/message";
 
 interface MessageItem {
   id: string;
@@ -433,46 +434,20 @@ export default function AdminAiChatbot({ existingCategories }: AdminAiChatbotPro
               </button>
             </div>
 
-            {/* Messages Body */}
-            <div
-              style={{
-                flex: 1,
-                padding: "12px",
-                overflowY: "auto",
-                display: "flex",
-                flexDirection: "column",
-                gap: "10px",
-                background: "var(--bg)",
-              }}
-            >
+            {/* Messages Body using ShadCN MessageScroller */}
+            <MessageScroller className="bg-zinc-50 dark:bg-zinc-950">
               {messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  style={{
-                    alignSelf: msg.sender === "user" ? "flex-end" : "flex-start",
-                    maxWidth: "85%",
-                  }}
-                >
-                  <div
-                    style={{
-                      padding: "10px 12px",
-                      borderRadius: msg.sender === "user" ? "14px 14px 2px 14px" : "14px 14px 14px 2px",
-                      background: msg.sender === "user" ? "var(--teal)" : "var(--paper)",
-                      color: msg.sender === "user" ? "#ffffff" : "var(--ink)",
-                      border: msg.sender === "user" ? "none" : "1px solid var(--line)",
-                      fontSize: "13px",
-                      lineHeight: "1.4",
-                      boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-                    }}
-                  >
+                <Message key={msg.id} sender={msg.sender}>
+                  {msg.sender === "ai" && <MessageAvatar fallback="AI" />}
+                  <MessageContent sender={msg.sender}>
                     {msg.imagePreview && (
                       <img
                         src={msg.imagePreview}
                         alt="Uploaded preview"
-                        style={{ width: "100%", height: "auto", borderRadius: "8px", marginBottom: "6px" }}
+                        className="w-full h-auto rounded-lg mb-1.5"
                       />
                     )}
-                    <div style={{ whiteSpace: "pre-line" }}>{msg.text}</div>
+                    <div className="whitespace-pre-line">{msg.text}</div>
 
                     {/* AI Calculator Result Card (Styled with Tailwind CSS) */}
                     {msg.calculatorCard && (
@@ -797,17 +772,17 @@ export default function AdminAiChatbot({ existingCategories }: AdminAiChatbotPro
                         </div>
                       </div>
                     )}
-                  </div>
-                </div>
+                  </MessageContent>
+                </Message>
               ))}
               {isLoading && (
-                <div style={{ alignSelf: "flex-start", display: "flex", alignItems: "center", gap: "6px", color: "var(--muted)", fontSize: "12px" }}>
-                  <Loader2 width="14" height="14" className="animate-spin" />
+                <div className="flex items-center gap-1.5 text-zinc-500 text-xs py-1">
+                  <Loader2 width="14" height="14" className="animate-spin text-teal-600" />
                   Analyzing product details...
                 </div>
               )}
               <div ref={messagesEndRef} />
-            </div>
+            </MessageScroller>
 
             {/* Image Selected Bar */}
             {selectedImage && (
