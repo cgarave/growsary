@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Sparkles, Calculator, X, Upload, RefreshCw, CheckCircle2, Loader2, Send, Image as ImageIcon } from "lucide-react";
+import { Sparkles, Calculator, X, Upload, RefreshCw, CheckCircle2, Loader2, Send, Image as ImageIcon, Bookmark, Trash2, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
@@ -38,12 +38,22 @@ interface ChatMessageItem {
   };
 }
 
+/** Saved Memory Entry Structure for AI Calculator (without base64 image) */
+export interface SavedCalculatorMemory {
+  id: string;
+  date: string;
+  items: CalculatorItem[];
+  totalSum: number;
+}
+
 interface AdminAiModalGroupProps {
   existingCategories: string[];
 }
 
-/** LocalStorage key for persisting calculator state */
+/** LocalStorage keys */
 const CALCULATOR_STORAGE_KEY = "growsary_admin_calculator_state";
+const SAVED_MEMORIES_STORAGE_KEY = "growsary_admin_calculator_memories";
+const MAX_MEMORIES = 5;
 
 /**
  * Unified Admin AI Modal Group Component
@@ -51,10 +61,10 @@ const CALCULATOR_STORAGE_KEY = "growsary_admin_calculator_state";
  * Features:
  * - Single modal with a top Segmented Button Group to toggle between AI Chatbot and AI Calculator modes.
  * - Uses ShadCN Message, MessageContent, MessageAvatar, and MessageScroller components.
- * - Persistent Calculator Results: Persisted in localStorage (`growsary_admin_calculator_state`) until Reset is clicked.
- * - Inline Editable Item Prices: Admins can dynamically edit parsed price values or names, automatically re-calculating total sum.
- * - Styled 100% strictly with Tailwind CSS.
- * - Fully documented with comments for code review.
+ * - Persistent Calculator Active State & Saved Memories (max 5 saved calculations in localStorage).
+ * - "Save for later" (left) & "Reset" (right) button pair.
+ * - "Delete Memory" button when viewing/inspecting a saved memory.
+ * - Styled 100% strictly with Tailwind CSS and fully commented.
  */
 export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGroupProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -76,19 +86,23 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
   const chatFileInputRef = useRef<HTMLInputElement>(null);
 
   // ---------------------------------------------------------------------------
-  // AI Calculator State & Logic (With LocalStorage Persistence & Dynamic Price Editing)
+  // AI Calculator State & Saved Memories
   // ---------------------------------------------------------------------------
   const [calcSelectedImage, setCalcSelectedImage] = useState<{ base64: string; mimeType: string; previewUrl: string } | null>(null);
   const [isCalcLoading, setIsCalcLoading] = useState(false);
   const [calcItems, setCalcItems] = useState<CalculatorItem[]>([]);
   const [calcTotalSum, setCalcTotalSum] = useState<number>(0);
+  const [savedMemories, setSavedMemories] = useState<SavedCalculatorMemory[]>([]);
+  const [activeMemoryId, setActiveMemoryId] = useState<string | null>(null);
+
   const calcFileInputRef = useRef<HTMLInputElement>(null);
 
   /**
-   * Load Persisted Calculator State from LocalStorage on Component Mount
+   * Load Active Calculator State & Saved Memories from LocalStorage
    */
   useEffect(() => {
     try {
+      // 1. Active state
       const savedStateStr = localStorage.getItem(CALCULATOR_STORAGE_KEY);
       if (savedStateStr) {
         const saved = JSON.parse(savedStateStr);
@@ -101,6 +115,18 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
         if (saved.calcSelectedImage) {
           setCalcSelectedImage(saved.calcSelectedImage);
         }
+        if (saved.activeMemoryId) {
+          setActiveMemoryId(saved.activeMemoryId);
+        }
+      }
+
+      // 2. Saved Memories list
+      const savedMemoriesStr = localStorage.getItem(SAVED_MEMORIES_STORAGE_KEY);
+      if (savedMemoriesStr) {
+        const list = JSON.parse(savedMemoriesStr);
+        if (Array.isArray(list)) {
+          setSavedMemories(list);
+        }
       }
     } catch (e) {
       console.error("Failed to load calculator state from localStorage:", e);
@@ -108,7 +134,7 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
   }, []);
 
   /**
-   * Auto-compute total sum whenever items array changes & save to LocalStorage
+   * Auto-compute total sum whenever items array changes & persist current work to LocalStorage
    */
   useEffect(() => {
     const computedTotal = calcItems.reduce((acc, item) => acc + (Number(item.price) || 0) * (item.qty || 1), 0);
@@ -122,13 +148,14 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
             calcItems,
             calcTotalSum: computedTotal,
             calcSelectedImage,
+            activeMemoryId,
           })
         );
       } catch (e) {
-        console.error("Failed to save calculator state to localStorage:", e);
+        console.error("Failed to save active calculator state:", e);
       }
     }
-  }, [calcItems, calcSelectedImage]);
+  }, [calcItems, calcSelectedImage, activeMemoryId]);
 
   // ---------------------------------------------------------------------------
   // Chatbot Handlers
@@ -238,6 +265,7 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
         setCalcSelectedImage(newImgState);
         setCalcItems([]);
         setCalcTotalSum(0);
+        setActiveMemoryId(null);
       };
       img.src = reader.result as string;
     };
@@ -260,6 +288,7 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
       if (res.success) {
         setCalcItems(res.items);
         setCalcTotalSum(res.totalSum);
+        setActiveMemoryId(null);
         toast.success(`Calculated Right-Side Total: ₱${res.totalSum.toFixed(2)}`);
       } else {
         toast.error(res.reply || "Failed to calculate numbers");
@@ -271,10 +300,7 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
     }
   };
 
-  /**
-   * Inline Edit Handler: Allows editing price or name of parsed calculator items
-   * Automatically triggers recalculation of total sum via useEffect.
-   */
+  /** Inline Edit Handler for Calculator Items */
   const handleItemFieldChange = (index: number, field: "name" | "price", value: string | number) => {
     setCalcItems((prev) => {
       const updated = [...prev];
@@ -287,18 +313,83 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
     });
   };
 
-  /**
-   * Reset Handler: Clears calculator state & removes saved state from LocalStorage
-   */
+  /** Reset Active Calculator Workspace */
   const handleResetCalculator = () => {
     setCalcSelectedImage(null);
     setCalcItems([]);
     setCalcTotalSum(0);
+    setActiveMemoryId(null);
     try {
       localStorage.removeItem(CALCULATOR_STORAGE_KEY);
       toast.info("Calculator reset.");
     } catch (e) {
       console.error("Error clearing localStorage:", e);
+    }
+  };
+
+  /**
+   * Save Memory for Later Handler
+   * Saves only items breakdown and total sum (no base64 image). Limit max 5 items.
+   */
+  const handleSaveForLater = () => {
+    if (calcItems.length === 0) {
+      toast.error("No calculation results to save.");
+      return;
+    }
+
+    if (savedMemories.length >= MAX_MEMORIES) {
+      toast.error(`Memory limit reached (${MAX_MEMORIES} max). Please delete at least one memory to save a new one.`);
+      return;
+    }
+
+    const newMemory: SavedCalculatorMemory = {
+      id: `mem-${Date.now()}`,
+      date: new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
+      items: calcItems,
+      totalSum: calcTotalSum,
+    };
+
+    const updatedMemories = [newMemory, ...savedMemories];
+    setSavedMemories(updatedMemories);
+    setActiveMemoryId(newMemory.id);
+
+    try {
+      localStorage.setItem(SAVED_MEMORIES_STORAGE_KEY, JSON.stringify(updatedMemories));
+      toast.success("Saved calculation to local memory!");
+    } catch (e) {
+      toast.error("Failed to save memory.");
+    }
+  };
+
+  /**
+   * Load Saved Memory into Active Calculator View
+   */
+  const handleLoadMemory = (mem: SavedCalculatorMemory) => {
+    setCalcItems(mem.items);
+    setCalcTotalSum(mem.totalSum);
+    setCalcSelectedImage(null);
+    setActiveMemoryId(mem.id);
+    toast.info(`Loaded memory from ${mem.date}`);
+  };
+
+  /**
+   * Delete Specific Saved Memory Handler
+   */
+  const handleDeleteMemory = (memId: string) => {
+    const updated = savedMemories.filter((m) => m.id !== memId);
+    setSavedMemories(updated);
+
+    if (activeMemoryId === memId) {
+      setActiveMemoryId(null);
+      setCalcItems([]);
+      setCalcTotalSum(0);
+    }
+
+    try {
+      localStorage.setItem(SAVED_MEMORIES_STORAGE_KEY, JSON.stringify(updated));
+      toast.success("Deleted memory entry.");
+    } catch (e) {
+      console.error("Failed to update saved memories:", e);
     }
   };
 
@@ -326,7 +417,6 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
             {/* Modal Top Header with Joined Segmented Button Group */}
             <div className="px-4 py-3 bg-zinc-900 text-white flex items-center justify-between border-b border-zinc-800">
               <div className="flex items-center gap-2">
-                {/* Joined Segmented Button Group to Switch Features */}
                 <ButtonGroup className="bg-zinc-800 p-0.5 rounded-xl">
                   <Button
                     size="sm"
@@ -357,7 +447,6 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
                 </ButtonGroup>
               </div>
 
-              {/* Top Close Button */}
               <button
                 onClick={() => setIsOpen(false)}
                 className="p-1 hover:bg-zinc-800 rounded-full transition-colors text-zinc-400 hover:text-white cursor-pointer"
@@ -399,7 +488,6 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
                   )}
                 </MessageScroller>
 
-                {/* Chatbot Image Attachment Indicator */}
                 {chatSelectedImage && (
                   <div className="px-3 py-1.5 bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -412,7 +500,6 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
                   </div>
                 )}
 
-                {/* Chat Input Bar */}
                 <div className="p-2.5 bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 flex items-center gap-2">
                   <input
                     type="file"
@@ -454,7 +541,7 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
               </div>
             )}
 
-            {/* TAB 2: AI CALCULATOR MODE (With LocalStorage Persistence & Inline Price Editing) */}
+            {/* TAB 2: AI CALCULATOR MODE (With Saved Memories Max 5, Save for Later & Delete Memory) */}
             {activeTab === "calculator" && (
               <div className="flex-1 flex flex-col p-4 overflow-y-auto space-y-4 bg-zinc-50 dark:bg-zinc-950">
                 <input
@@ -465,8 +552,43 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
                   className="hidden"
                 />
 
+                {/* Saved Memories Quick Bar (Max 5) */}
+                {savedMemories.length > 0 && (
+                  <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2.5 space-y-1.5 shadow-xs">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-zinc-600 dark:text-zinc-400">
+                      <span className="flex items-center gap-1 text-teal-600 dark:text-teal-400">
+                        <Bookmark className="w-3.5 h-3.5" /> Saved Calculator Memories
+                      </span>
+                      <span className="text-[10px] text-zinc-400 font-mono">
+                        {savedMemories.length}/{MAX_MEMORIES} used
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+                      {savedMemories.map((mem) => {
+                        const isSelected = activeMemoryId === mem.id;
+                        return (
+                          <button
+                            key={mem.id}
+                            onClick={() => handleLoadMemory(mem)}
+                            className={`px-2.5 py-1 text-xs rounded-lg font-semibold shrink-0 transition-all flex items-center gap-1.5 cursor-pointer ${
+                              isSelected
+                                ? "bg-teal-600 text-white shadow-xs"
+                                : "bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300"
+                            }`}
+                          >
+                            <Clock className="w-3 h-3 opacity-70" />
+                            <span>₱{mem.totalSum.toFixed(2)}</span>
+                            <span className="text-[10px] opacity-75">({mem.items.length})</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-4 flex-1">
-                  {!calcSelectedImage ? (
+                  {!calcSelectedImage && !activeMemoryId && calcItems.length === 0 ? (
                     <div
                       onClick={() => calcFileInputRef.current?.click()}
                       className="border-2 border-dashed border-zinc-300 dark:border-zinc-700 hover:border-teal-500 rounded-2xl p-6 text-center cursor-pointer bg-white dark:bg-zinc-900 transition-all group"
@@ -482,38 +604,40 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
                       </p>
                     </div>
                   ) : (
-                    <div className="space-y-3">
-                      <div className="relative rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-950">
-                        <img src={calcSelectedImage.previewUrl} alt="Prices list" className="w-full max-h-40 object-contain" />
-                        <button
-                          onClick={handleResetCalculator}
-                          className="absolute top-2 right-2 p-1.5 bg-zinc-900/80 hover:bg-zinc-900 text-white rounded-full cursor-pointer"
-                          title="Clear photo"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
+                    calcSelectedImage && (
+                      <div className="space-y-3">
+                        <div className="relative rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-950">
+                          <img src={calcSelectedImage.previewUrl} alt="Prices list" className="w-full max-h-40 object-contain" />
+                          <button
+                            onClick={handleResetCalculator}
+                            className="absolute top-2 right-2 p-1.5 bg-zinc-900/80 hover:bg-zinc-900 text-white rounded-full cursor-pointer"
+                            title="Clear photo"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
 
-                      {calcItems.length === 0 && (
-                        <Button
-                          onClick={handleCalculateRightNumbers}
-                          disabled={isCalcLoading}
-                          className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs py-2.5 rounded-xl flex items-center justify-center gap-2 cursor-pointer"
-                        >
-                          {isCalcLoading ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              Scanning right-side numbers...
-                            </>
-                          ) : (
-                            <>
-                              <Calculator className="w-4 h-4" />
-                              Calculate Right-Side Numbers
-                            </>
-                          )}
-                        </Button>
-                      )}
-                    </div>
+                        {calcItems.length === 0 && (
+                          <Button
+                            onClick={handleCalculateRightNumbers}
+                            disabled={isCalcLoading}
+                            className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs py-2.5 rounded-xl flex items-center justify-center gap-2 cursor-pointer"
+                          >
+                            {isCalcLoading ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Scanning right-side numbers...
+                              </>
+                            ) : (
+                              <>
+                                <Calculator className="w-4 h-4" />
+                                Calculate Right-Side Numbers
+                              </>
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                    )
                   )}
 
                   {/* Calculator Extracted Results Breakdown Card with Editable Prices */}
@@ -561,17 +685,44 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
                   )}
                 </div>
 
-                {/* Bottom Calculator Reset Action Footer */}
+                {/* Bottom Calculator Action Footer: "Save for later" (Left) | "Reset" (Right) */}
                 {calcItems.length > 0 && (
-                  <div className="pt-2 flex items-center justify-end">
-                    <Button
-                      variant="outline"
-                      onClick={handleResetCalculator}
-                      className="w-full text-xs font-semibold border-zinc-300 rounded-xl cursor-pointer text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5 mr-1 text-zinc-500" />
-                      Reset Calculator
-                    </Button>
+                  <div className="pt-2 space-y-2">
+                    <div className="flex items-center gap-2">
+                      {/* Left: Save for later button */}
+                      <Button
+                        variant="outline"
+                        onClick={handleSaveForLater}
+                        className="flex-1 text-xs font-bold border-teal-200 bg-teal-50 hover:bg-teal-100 text-teal-700 dark:text-teal-300 dark:bg-teal-950 dark:border-teal-900 rounded-xl cursor-pointer"
+                        title="Save calculation result to local memories"
+                      >
+                        <Bookmark className="w-3.5 h-3.5 mr-1.5 text-teal-600" />
+                        Save for later
+                      </Button>
+
+                      {/* Right: Reset button */}
+                      <Button
+                        variant="outline"
+                        onClick={handleResetCalculator}
+                        className="flex-1 text-xs font-semibold border-zinc-300 rounded-xl cursor-pointer text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                        title="Reset current calculator view"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5 mr-1 text-zinc-500" />
+                        Reset
+                      </Button>
+                    </div>
+
+                    {/* Delete Memory Button appears when a saved memory is currently loaded */}
+                    {activeMemoryId && (
+                      <Button
+                        variant="outline"
+                        onClick={() => handleDeleteMemory(activeMemoryId)}
+                        className="w-full text-xs font-bold text-red-600 border-red-200 bg-red-50 hover:bg-red-100 dark:bg-red-950 dark:border-red-900 rounded-xl cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                        Delete Saved Memory
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
@@ -583,4 +734,5 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
     </>
   );
 }
+
 
