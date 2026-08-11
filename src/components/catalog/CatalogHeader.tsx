@@ -58,6 +58,25 @@ export default function CatalogHeader({
 
 				</section>
 
+				<div className="flex flex-row justify-between items-center">
+					{/* Inline Admin Action Bar */}
+					<div className={`price-toggle ${priceMode}`} id="priceToggle">
+						<div className="knob"></div>
+						<button onClick={() => onTogglePriceMode("retail")}>Retail</button>
+						<button onClick={() => onTogglePriceMode("wholesale")}>Wholesale</button>
+					</div>
+					<div className="space-x-2">
+						<Button variant="outline" className="border-zinc-300 rounded-[9px]" onClick={onOpenScanner}>
+							<Camera data-icon="inline-start" />
+						</Button>
+						<Button variant="outline" className="border-zinc-300 rounded-[9px] relative" onClick={onOpenCart}>
+							<ShoppingBag data-icon="inline-start" />
+							{totalCartCount > 0 && (
+								<span className="cart-count">{totalCartCount}</span>
+							)}
+						</Button>
+					</div>
+				</div>
 				<div className="flex flex-row gap-x-2">
 					<InputGroup className="w-full border-zinc-300 rounded-[9px]">
 						<InputGroupInput placeholder="Search..." value={searchQuery} onChange={(e) => onSearchChange(e.target.value)} />
@@ -65,34 +84,15 @@ export default function CatalogHeader({
 							<Search />
 						</InputGroupAddon>
 					</InputGroup>
-					<Button variant="outline" className="border-zinc-300 rounded-[9px]" onClick={onOpenScanner}>
-						<Camera data-icon="inline-start" />
-					</Button>
-					<Button variant="outline" className="border-zinc-300 rounded-[9px] relative" onClick={onOpenCart}>
-						<ShoppingBag data-icon="inline-start" />
-						{totalCartCount > 0 && (
-							<span className="cart-count">{totalCartCount}</span>
-						)}
-					</Button>
-				</div>
-
-				{/* Inline Admin Action Bar */}
-				<div className="flex flex-row justify-between">
-					<div className={`price-toggle ${priceMode}`} id="priceToggle">
-						<div className="knob"></div>
-						<button onClick={() => onTogglePriceMode("retail")}>Retail</button>
-						<button onClick={() => onTogglePriceMode("wholesale")}>Wholesale</button>
-					</div>
 					{isAdmin && (
-						<div className="admin-actions-bar" style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+						<>
 							<Button variant="outline" className="border-zinc-300 rounded-[9px] text-xs" onClick={onOpenAddProduct}>
-								<Plus data-icon="inline-start" /> Add Item
+								<Plus data-icon="inline-start" />
 							</Button>
 							<AdminAiChatbot existingCategories={categories} />
-						</div>
+						</>
 					)}
 				</div>
-
 			</div>
 		</header>
 	);

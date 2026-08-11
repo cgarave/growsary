@@ -185,7 +185,7 @@ export default function AdminAiChatbot({ existingCategories }: AdminAiChatbotPro
         <Sparkles width="15" height="15" />
       </button> */}
       <Button variant="outline" className="border-zinc-300 rounded-[9px] text-xs" onClick={() => setIsOpen((prev) => !prev)}>
-        <Sparkles data-icon="inline-start" /> AI
+        <Sparkles data-icon="inline-start" />
       </Button>
 
       {/* AI Chat Drawer / Modal - Mobile Friendly */}
