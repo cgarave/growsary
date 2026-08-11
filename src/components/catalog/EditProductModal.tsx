@@ -25,6 +25,8 @@ export default function EditProductModal({
   const [editProdName, setEditProdName] = useState("");
   const [editProdBrand, setEditProdBrand] = useState("");
   const [editProdCategory, setEditProdCategory] = useState("Softdrinks");
+  const [isAddingCustomCategory, setIsAddingCustomCategory] = useState(false);
+  const [customCategoryName, setCustomCategoryName] = useState("");
   const [editProdBarcode, setEditProdBarcode] = useState("");
   const [editProdImageUrl, setEditProdImageUrl] = useState("");
   const [editVariants, setEditVariants] = useState<
@@ -36,6 +38,8 @@ export default function EditProductModal({
       setEditProdName(product.name);
       setEditProdBrand(product.brand || "");
       setEditProdCategory(product.categoryName);
+      setIsAddingCustomCategory(false);
+      setCustomCategoryName("");
       setEditProdBarcode(product.barcode || "");
       setEditProdImageUrl(product.imageUrl || "");
       setEditVariants(
@@ -70,7 +74,11 @@ export default function EditProductModal({
     const brand = editProdBrand;
     const barcode = editProdBarcode;
     const imageUrl = editProdImageUrl;
-    const categoryName = editProdCategory;
+
+    let categoryName = editProdCategory;
+    if (isAddingCustomCategory && customCategoryName.trim()) {
+      categoryName = customCategoryName.trim();
+    }
 
     const validVariants = editVariants.map((v) => ({
       id: v.id,
@@ -130,27 +138,59 @@ export default function EditProductModal({
               onChange={(e) => setEditProdName(e.target.value)}
             />
           </div>
-          <div className="field">
-            <label>Brand</label>
-            <input
-              type="text"
-              value={editProdBrand}
-              onChange={(e) => setEditProdBrand(e.target.value)}
-            />
+
+          {/* Merged Brand & Category Row */}
+          <div style={{ display: "flex", gap: "10px" }}>
+            <div className="field" style={{ flex: 1 }}>
+              <label>Brand</label>
+              <input
+                type="text"
+                value={editProdBrand}
+                onChange={(e) => setEditProdBrand(e.target.value)}
+              />
+            </div>
+            <div className="field" style={{ flex: 1 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "5px" }}>
+                <label style={{ margin: 0 }}>Category</label>
+                <button
+                  type="button"
+                  onClick={() => setIsAddingCustomCategory((prev) => !prev)}
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    color: "var(--teal)",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    padding: 0,
+                  }}
+                >
+                  {isAddingCustomCategory ? "← Select existing" : "+ Add new category"}
+                </button>
+              </div>
+              {isAddingCustomCategory ? (
+                <input
+                  type="text"
+                  required
+                  placeholder="New category name"
+                  value={customCategoryName}
+                  onChange={(e) => setCustomCategoryName(e.target.value)}
+                />
+              ) : (
+                <select
+                  value={editProdCategory}
+                  onChange={(e) => setEditProdCategory(e.target.value)}
+                >
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.name}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
           </div>
-          <div className="field">
-            <label>Category</label>
-            <select
-              value={editProdCategory}
-              onChange={(e) => setEditProdCategory(e.target.value)}
-            >
-              {categories.map((c) => (
-                <option key={c.id} value={c.name}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
+
           <div className="field">
             <label>
               Image URL <span className="optional-tag">— optional image link</span>
@@ -192,14 +232,14 @@ export default function EditProductModal({
                 style={{
                   fontSize: "11px",
                   fontWeight: 700,
-                  padding: "4px 10px",
-                  borderRadius: "6px",
-                  border: "1px solid var(--line)",
-                  background: "var(--paper)",
+                  color: "var(--teal)",
+                  background: "none",
+                  border: "none",
                   cursor: "pointer",
+                  padding: 0,
                 }}
               >
-                + Add Variant
+                + Add variant
               </button>
             </div>
 

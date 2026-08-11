@@ -137,55 +137,60 @@ export default function AddProductModal({
               onChange={(e) => setNewProdName(e.target.value)}
             />
           </div>
-          <div className="field">
-            <label>Brand</label>
-            <input
-              type="text"
-              placeholder="e.g. Coca-Cola Co."
-              value={newProdBrand}
-              onChange={(e) => setNewProdBrand(e.target.value)}
-            />
-          </div>
-          <div className="field">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-              <label style={{ margin: 0 }}>Category</label>
-              <button
-                type="button"
-                onClick={() => setIsAddingCustomCategory((prev) => !prev)}
-                style={{
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  color: "var(--teal)",
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  padding: 0,
-                }}
-              >
-                {isAddingCustomCategory ? "← Select existing category" : "+ Add new category"}
-              </button>
-            </div>
-            {isAddingCustomCategory ? (
+
+          {/* Merged Brand & Category Row */}
+          <div style={{ display: "flex", gap: "10px" }}>
+            <div className="field" style={{ flex: 1 }}>
+              <label>Brand</label>
               <input
                 type="text"
-                required
-                placeholder="Enter new category name (e.g. Frozen Foods)"
-                value={customCategoryName}
-                onChange={(e) => setCustomCategoryName(e.target.value)}
+                placeholder="e.g. Coca-Cola Co."
+                value={newProdBrand}
+                onChange={(e) => setNewProdBrand(e.target.value)}
               />
-            ) : (
-              <select
-                value={newProdCategory}
-                onChange={(e) => setNewProdCategory(e.target.value)}
-              >
-                {categories.map((c) => (
-                  <option key={c.id} value={c.name}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            )}
+            </div>
+            <div className="field" style={{ flex: 1 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "5px" }}>
+                <label style={{ margin: 0 }}>Category</label>
+                <button
+                  type="button"
+                  onClick={() => setIsAddingCustomCategory((prev) => !prev)}
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    color: "var(--teal)",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    padding: 0,
+                  }}
+                >
+                  {isAddingCustomCategory ? "← Select existing" : "+ Add new category"}
+                </button>
+              </div>
+              {isAddingCustomCategory ? (
+                <input
+                  type="text"
+                  required
+                  placeholder="New category name"
+                  value={customCategoryName}
+                  onChange={(e) => setCustomCategoryName(e.target.value)}
+                />
+              ) : (
+                <select
+                  value={newProdCategory}
+                  onChange={(e) => setNewProdCategory(e.target.value)}
+                >
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.name}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
           </div>
+
           <div className="field">
             <label>
               Image URL <span className="optional-tag">— optional image link</span>
