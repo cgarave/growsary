@@ -23,7 +23,6 @@ model Product {
   id           String           @id @default(cuid())
   name         String
   brand        String?
-  barcode      String?          @unique
   imageUrl     String?
   categoryId   String
   category     Category         @relation(fields: [categoryId], references: [id], onDelete: Cascade)
@@ -36,6 +35,7 @@ model Product {
 model ProductVariant {
   id        String   @id @default(cuid())
   label     String
+  barcode   String?  @unique
   productId String
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   prices    Price[]

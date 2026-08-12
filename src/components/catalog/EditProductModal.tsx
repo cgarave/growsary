@@ -10,7 +10,9 @@ interface EditProductModalProps {
   isOpen: boolean;
   onClose: () => void;
   categories: CatalogCategory[];
-  onOpenScanner: () => void;
+  onOpenScanner: (variantIndex?: number) => void;
+  scannedBarcode?: string;
+  activeScanVariantIndex?: number | null;
   onProductUpdated: (updatedProduct: CatalogProduct) => void;
 }
 
@@ -20,6 +22,8 @@ export default function EditProductModal({
   onClose,
   categories,
   onOpenScanner,
+  scannedBarcode,
+  activeScanVariantIndex,
   onProductUpdated,
 }: EditProductModalProps) {
   const [editProdName, setEditProdName] = useState("");
@@ -27,10 +31,9 @@ export default function EditProductModal({
   const [editProdCategory, setEditProdCategory] = useState("Softdrinks");
   const [isAddingCustomCategory, setIsAddingCustomCategory] = useState(false);
   const [customCategoryName, setCustomCategoryName] = useState("");
-  const [editProdBarcode, setEditProdBarcode] = useState("");
   const [editProdImageUrl, setEditProdImageUrl] = useState("");
   const [editVariants, setEditVariants] = useState<
-    Array<{ id?: string; label: string; retailPrice: string; wholesalePrice: string }>
+    Array<{ id?: string; label: string; barcode: string; retailPrice: string; wholesalePrice: string }>
   >([]);
 
   useEffect(() => {
@@ -40,12 +43,12 @@ export default function EditProductModal({
       setEditProdCategory(product.categoryName);
       setIsAddingCustomCategory(false);
       setCustomCategoryName("");
-      setEditProdBarcode(product.barcode || "");
       setEditProdImageUrl(product.imageUrl || "");
       setEditVariants(
         product.variants.map((v) => ({
           id: v.id,
           label: v.label,
+          barcode: v.barcode || "",
           retailPrice: v.retailPrice.toString(),
           wholesalePrice: v.wholesalePrice.toString(),
         }))
@@ -53,12 +56,23 @@ export default function EditProductModal({
     }
   }, [product]);
 
+  // Apply scanned barcode to target variant input when barcode is scanned
+  useEffect(() => {
+    if (scannedBarcode && activeScanVariantIndex !== undefined && activeScanVariantIndex !== null) {
+      setEditVariants((prev) =>
+        prev.map((item, idx) =>
+          idx === activeScanVariantIndex ? { ...item, barcode: scannedBarcode } : item
+        )
+      );
+    }
+  }, [scannedBarcode, activeScanVariantIndex]);
+
   if (!isOpen || !product) return null;
 
   const handleAddVariant = () => {
     setEditVariants((prev) => [
       ...prev,
-      { label: "", retailPrice: "", wholesalePrice: "" },
+      { label: "", barcode: "", retailPrice: "", wholesalePrice: "" },
     ]);
   };
 
@@ -72,7 +86,6 @@ export default function EditProductModal({
     const targetId = product.id;
     const name = editProdName;
     const brand = editProdBrand;
-    const barcode = editProdBarcode;
     const imageUrl = editProdImageUrl;
 
     let categoryName = editProdCategory;
@@ -83,6 +96,7 @@ export default function EditProductModal({
     const validVariants = editVariants.map((v) => ({
       id: v.id,
       label: v.label.trim() || "Standard",
+      barcode: v.barcode.trim() || undefined,
       retailPrice: parseFloat(v.retailPrice) || 0,
       wholesalePrice: parseFloat(v.wholesalePrice) || 0,
     }));
@@ -92,12 +106,12 @@ export default function EditProductModal({
       ...product,
       name,
       brand: brand || null,
-      barcode: barcode || null,
       imageUrl: imageUrl || null,
       categoryName,
       variants: validVariants.map((v, idx) => ({
         id: v.id || `v-temp-${Date.now()}-${idx}`,
         label: v.label,
+        barcode: v.barcode || null,
         retailPrice: v.retailPrice,
         wholesalePrice: v.wholesalePrice,
         recentChange: true,
@@ -115,7 +129,6 @@ export default function EditProductModal({
         brand: brand || undefined,
         categoryName,
         imageUrl: imageUrl || undefined,
-        barcode: barcode || undefined,
         variants: validVariants,
       });
     } catch (err: any) {
@@ -127,7 +140,7 @@ export default function EditProductModal({
     <div className="overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal">
         <h3>Edit item</h3>
-        <div className="sub">Update product details, sizes, and pricing.</div>
+        <div className="sub">Update product details, sizes, pricing, and barcodes.</div>
         <form onSubmit={handleUpdateProduct}>
           <div className="modal-scroll-content">
             <div className="field">
@@ -140,7 +153,6 @@ export default function EditProductModal({
               />
             </div>
 
-            {/* Merged Brand & Category Row */}
             <div style={{ display: "flex", gap: "10px" }}>
               <div className="field" style={{ flex: 1 }}>
                 <label>Brand</label>
@@ -203,30 +215,11 @@ export default function EditProductModal({
                 onChange={(e) => setEditProdImageUrl(e.target.value)}
               />
             </div>
-            <div className="field">
-              <label>
-                Barcode <span className="optional-tag">— optional, one per product</span>
-              </label>
-              <div className="barcode-row">
-                <input
-                  type="text"
-                  placeholder="Leave blank if none"
-                  value={editProdBarcode}
-                  onChange={(e) => setEditProdBarcode(e.target.value)}
-                />
-                <div
-                  className="scan-inline"
-                  onClick={onOpenScanner}
-                >
-                  <Camera width="16" height="16" />
-                </div>
-              </div>
-            </div>
 
-            {/* Variants Section */}
-            <div className="field" style={{ marginTop: "16px" }}>
+            {/* Multi-Variant & Barcode Section */}
+            <div className="field">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                <label style={{ margin: 0 }}>Variants & Prices</label>
+                <label style={{ margin: 0 }}>Product Variants, Prices & Barcodes</label>
                 <button
                   type="button"
                   onClick={handleAddVariant}
@@ -252,7 +245,7 @@ export default function EditProductModal({
                     border: "1px solid var(--line)",
                     borderRadius: "9px",
                     padding: "10px",
-                    marginBottom: "8px",
+                    marginBottom: "10px",
                   }}
                 >
                   <div style={{ display: "flex", gap: "8px", marginBottom: "6px", alignItems: "center" }}>
@@ -288,7 +281,8 @@ export default function EditProductModal({
                       </button>
                     )}
                   </div>
-                  <div style={{ display: "flex", gap: "8px" }}>
+
+                  <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
                     <div style={{ flex: 1 }}>
                       <label style={{ fontSize: "10px", color: "var(--muted)", marginBottom: "2px" }}>
                         Retail (₱)
@@ -324,6 +318,33 @@ export default function EditProductModal({
                           );
                         }}
                       />
+                    </div>
+                  </div>
+
+                  {/* Variant Barcode Field at bottom of variant */}
+                  <div>
+                    <label style={{ fontSize: "10px", color: "var(--muted)", marginBottom: "2px", display: "block" }}>
+                      Variant Barcode <span className="optional-tag">— optional</span>
+                    </label>
+                    <div className="barcode-row">
+                      <input
+                        type="text"
+                        placeholder="Scan or enter variant barcode"
+                        value={v.barcode}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setEditVariants((prev) =>
+                            prev.map((item, idx) => (idx === i ? { ...item, barcode: val } : item))
+                          );
+                        }}
+                      />
+                      <div
+                        className="scan-inline"
+                        onClick={() => onOpenScanner(i)}
+                        title="Scan barcode for this variant"
+                      >
+                        <Camera width="16" height="16" />
+                      </div>
                     </div>
                   </div>
                 </div>

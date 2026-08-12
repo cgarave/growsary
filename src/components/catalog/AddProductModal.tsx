@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Camera } from "lucide-react";
 import { CatalogCategory, CatalogProduct, createProductAction } from "@/app/actions";
 import { toast } from "sonner";
@@ -9,7 +9,9 @@ interface AddProductModalProps {
   isOpen: boolean;
   onClose: () => void;
   categories: CatalogCategory[];
-  onOpenScanner: () => void;
+  onOpenScanner: (variantIndex?: number) => void;
+  scannedBarcode?: string;
+  activeScanVariantIndex?: number | null;
   onProductCreated: (newProduct: CatalogProduct, newCategoryName?: string) => void;
   onProductUpdated: (updatedProduct: CatalogProduct) => void;
 }
@@ -19,6 +21,8 @@ export default function AddProductModal({
   onClose,
   categories,
   onOpenScanner,
+  scannedBarcode,
+  activeScanVariantIndex,
   onProductCreated,
   onProductUpdated,
 }: AddProductModalProps) {
@@ -28,17 +32,27 @@ export default function AddProductModal({
   const [isAddingCustomCategory, setIsAddingCustomCategory] = useState(false);
   const [customCategoryName, setCustomCategoryName] = useState("");
   const [newProdImageUrl, setNewProdImageUrl] = useState("");
-  const [newProdBarcode, setNewProdBarcode] = useState("");
   const [newProdVariants, setNewProdVariants] = useState<
-    Array<{ label: string; retailPrice: string; wholesalePrice: string }>
-  >([{ label: "Standard", retailPrice: "", wholesalePrice: "" }]);
+    Array<{ label: string; barcode: string; retailPrice: string; wholesalePrice: string }>
+  >([{ label: "Standard", barcode: "", retailPrice: "", wholesalePrice: "" }]);
+
+  // Apply scanned barcode to target variant input when barcode is scanned
+  useEffect(() => {
+    if (scannedBarcode && activeScanVariantIndex !== undefined && activeScanVariantIndex !== null) {
+      setNewProdVariants((prev) =>
+        prev.map((item, idx) =>
+          idx === activeScanVariantIndex ? { ...item, barcode: scannedBarcode } : item
+        )
+      );
+    }
+  }, [scannedBarcode, activeScanVariantIndex]);
 
   if (!isOpen) return null;
 
   const handleAddVariant = () => {
     setNewProdVariants((prev) => [
       ...prev,
-      { label: "", retailPrice: "", wholesalePrice: "" },
+      { label: "", barcode: "", retailPrice: "", wholesalePrice: "" },
     ]);
   };
 
@@ -56,6 +70,7 @@ export default function AddProductModal({
 
     const validVariants = newProdVariants.map((v) => ({
       label: v.label.trim() || "Standard",
+      barcode: v.barcode.trim() || undefined,
       retailPrice: parseFloat(v.retailPrice) || 0,
       wholesalePrice: parseFloat(v.wholesalePrice) || 0,
     }));
@@ -66,7 +81,6 @@ export default function AddProductModal({
       id: tempId,
       name: newProdName,
       brand: newProdBrand || null,
-      barcode: newProdBarcode || null,
       imageUrl: newProdImageUrl || null,
       isOutOfStock: false,
       categoryId: `cat-temp`,
@@ -75,6 +89,7 @@ export default function AddProductModal({
       variants: validVariants.map((v, idx) => ({
         id: `v-new-${Date.now()}-${idx}`,
         label: v.label,
+        barcode: v.barcode || null,
         retailPrice: v.retailPrice,
         wholesalePrice: v.wholesalePrice,
         recentChange: true,
@@ -88,7 +103,6 @@ export default function AddProductModal({
     // Reset form fields immediately
     const nameToSave = newProdName;
     const brandToSave = newProdBrand;
-    const barcodeToSave = newProdBarcode;
     const imageToSave = newProdImageUrl;
 
     setNewProdName("");
@@ -96,8 +110,7 @@ export default function AddProductModal({
     setIsAddingCustomCategory(false);
     setCustomCategoryName("");
     setNewProdImageUrl("");
-    setNewProdBarcode("");
-    setNewProdVariants([{ label: "Standard", retailPrice: "", wholesalePrice: "" }]);
+    setNewProdVariants([{ label: "Standard", barcode: "", retailPrice: "", wholesalePrice: "" }]);
 
     // 2. BACKGROUND SERVER CALL
     try {
@@ -106,7 +119,6 @@ export default function AddProductModal({
         brand: brandToSave || undefined,
         categoryName: finalCategory,
         imageUrl: imageToSave || undefined,
-        barcode: barcodeToSave || undefined,
         variants: validVariants,
       });
 
@@ -125,7 +137,7 @@ export default function AddProductModal({
     <div className="overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal">
         <h3>Add new item</h3>
-        <div className="sub">Variants and prices can be added right after you save the base product.</div>
+        <div className="sub">Variants, prices, and barcodes can be added right after you save the base product.</div>
         <form onSubmit={handleCreateProduct}>
           <div className="modal-scroll-content">
             <div className="field">
@@ -203,30 +215,11 @@ export default function AddProductModal({
                 onChange={(e) => setNewProdImageUrl(e.target.value)}
               />
             </div>
-            <div className="field">
-              <label>
-                Barcode <span className="optional-tag">— optional, one per product</span>
-              </label>
-              <div className="barcode-row">
-                <input
-                  type="text"
-                  placeholder="Leave blank if none"
-                  value={newProdBarcode}
-                  onChange={(e) => setNewProdBarcode(e.target.value)}
-                />
-                <div
-                  className="scan-inline"
-                  onClick={onOpenScanner}
-                >
-                  <Camera width="16" height="16" />
-                </div>
-              </div>
-            </div>
 
-            {/* Multi-Variant Section */}
+            {/* Multi-Variant & Barcode Section */}
             <div className="field">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                <label style={{ margin: 0 }}>Product Variants & Pricing</label>
+                <label style={{ margin: 0 }}>Product Variants, Prices & Barcodes</label>
                 <button
                   type="button"
                   onClick={handleAddVariant}
@@ -252,7 +245,7 @@ export default function AddProductModal({
                     border: "1px solid var(--line)",
                     borderRadius: "9px",
                     padding: "10px",
-                    marginBottom: "8px",
+                    marginBottom: "10px",
                   }}
                 >
                   <div style={{ display: "flex", gap: "8px", marginBottom: "6px", alignItems: "center" }}>
@@ -288,7 +281,8 @@ export default function AddProductModal({
                       </button>
                     )}
                   </div>
-                  <div style={{ display: "flex", gap: "8px" }}>
+
+                  <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
                     <div style={{ flex: 1 }}>
                       <label style={{ fontSize: "10px", color: "var(--muted)", marginBottom: "2px" }}>
                         Retail (₱)
@@ -324,6 +318,33 @@ export default function AddProductModal({
                           );
                         }}
                       />
+                    </div>
+                  </div>
+
+                  {/* Variant Barcode Field at bottom of variant */}
+                  <div>
+                    <label style={{ fontSize: "10px", color: "var(--muted)", marginBottom: "2px", display: "block" }}>
+                      Variant Barcode <span className="optional-tag">— optional</span>
+                    </label>
+                    <div className="barcode-row">
+                      <input
+                        type="text"
+                        placeholder="Scan or enter variant barcode"
+                        value={v.barcode}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setNewProdVariants((prev) =>
+                            prev.map((item, idx) => (idx === i ? { ...item, barcode: val } : item))
+                          );
+                        }}
+                      />
+                      <div
+                        className="scan-inline"
+                        onClick={() => onOpenScanner(i)}
+                        title="Scan barcode for this variant"
+                      >
+                        <Camera width="16" height="16" />
+                      </div>
                     </div>
                   </div>
                 </div>

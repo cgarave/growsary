@@ -8,6 +8,7 @@ export type PriceType = "RETAIL" | "WHOLESALE";
 export interface VariantPrice {
   id: string;
   label: string;
+  barcode: string | null;
   retailPrice: number;
   wholesalePrice: number;
   recentChange: boolean;
@@ -17,7 +18,6 @@ export interface CatalogProduct {
   id: string;
   name: string;
   brand: string | null;
-  barcode: string | null;
   imageUrl: string | null;
   isOutOfStock: boolean;
   categoryId: string;
@@ -87,6 +87,7 @@ export const getCatalogData = unstable_cache(
         return {
           id: v.id,
           label: v.label,
+          barcode: v.barcode,
           retailPrice: retailAmt,
           wholesalePrice: wholesaleAmt,
           recentChange,
@@ -97,7 +98,6 @@ export const getCatalogData = unstable_cache(
         id: p.id,
         name: p.name,
         brand: p.brand,
-        barcode: p.barcode,
         imageUrl: p.imageUrl,
         isOutOfStock: p.isOutOfStock,
         categoryId: p.categoryId,
@@ -173,14 +173,15 @@ export async function deleteCategoryAction(categoryId: string) {
 export async function createProductAction(data: {
   name: string;
   brand?: string;
-  barcode?: string;
   imageUrl?: string;
   categoryName: string;
   variantLabel?: string;
   retailPrice?: number;
   wholesalePrice?: number;
+  barcode?: string;
   variants?: Array<{
     label: string;
+    barcode?: string;
     retailPrice: number;
     wholesalePrice: number;
   }>;
@@ -201,6 +202,7 @@ export async function createProductAction(data: {
       : [
           {
             label: data.variantLabel || "Standard",
+            barcode: data.barcode || undefined,
             retailPrice: data.retailPrice || 0,
             wholesalePrice: data.wholesalePrice || 0,
           },
@@ -210,12 +212,12 @@ export async function createProductAction(data: {
     data: {
       name: data.name,
       brand: data.brand || null,
-      barcode: data.barcode || null,
       imageUrl: data.imageUrl || null,
       categoryId: category.id,
       variants: {
         create: variantsList.map((v) => ({
           label: v.label || "Standard",
+          barcode: v.barcode || null,
           prices: {
             create: [
               { type: "RETAIL", amount: v.retailPrice },
@@ -236,12 +238,12 @@ export async function updateProductAction(data: {
   id: string;
   name: string;
   brand?: string;
-  barcode?: string;
   imageUrl?: string;
   categoryName: string;
   variants: Array<{
     id?: string;
     label: string;
+    barcode?: string;
     retailPrice: number;
     wholesalePrice: number;
   }>;
@@ -261,7 +263,6 @@ export async function updateProductAction(data: {
     data: {
       name: data.name,
       brand: data.brand || null,
-      barcode: data.barcode || null,
       imageUrl: data.imageUrl || null,
       categoryId: category.id,
     },
@@ -288,7 +289,10 @@ export async function updateProductAction(data: {
     if (v.id && !v.id.startsWith("v-temp-")) {
       await prisma.productVariant.update({
         where: { id: v.id },
-        data: { label: v.label },
+        data: {
+          label: v.label,
+          barcode: v.barcode || null,
+        },
       });
 
       const latestPrices = await prisma.price.findMany({
@@ -323,6 +327,7 @@ export async function updateProductAction(data: {
       await prisma.productVariant.create({
         data: {
           label: v.label || "Standard",
+          barcode: v.barcode || null,
           productId: data.id,
           prices: {
             create: [

@@ -43,7 +43,7 @@ export default function ProductCard({
           CATEGORY_EMOJIS[categoryName] || "🥤"
         )}
         {p.isOutOfStock && <div className="oos-badge">Unavailable</div>}
-        {p.barcode && <div className="barcode-badge">barcode ✓</div>}
+        {p.variants.some((v) => !!v.barcode) && <div className="barcode-badge">barcode ✓</div>}
       </div>
 
       <div>

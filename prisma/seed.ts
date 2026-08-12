@@ -156,23 +156,30 @@ async function main() {
     });
 
     for (const prodData of catGroup.products) {
-      const product = await prisma.product.upsert({
-        where: { barcode: prodData.barcode ?? `temp-${prodData.name.toLowerCase().replace(/\s+/g, "-")}` },
-        update: {
-          name: prodData.name,
-          brand: prodData.brand,
-          isOutOfStock: prodData.isOutOfStock,
-        },
-        create: {
-          name: prodData.name,
-          brand: prodData.brand,
-          barcode: prodData.barcode,
-          categoryId: category.id,
-          isOutOfStock: prodData.isOutOfStock,
-        },
+      let product = await prisma.product.findFirst({
+        where: { name: prodData.name, categoryId: category.id },
       });
 
-      for (const vData of prodData.variants as Array<{ label: string; retail: number; wholesale: number; recentChange?: boolean }>) {
+      if (!product) {
+        product = await prisma.product.create({
+          data: {
+            name: prodData.name,
+            brand: prodData.brand,
+            categoryId: category.id,
+            isOutOfStock: prodData.isOutOfStock,
+          },
+        });
+      } else {
+        product = await prisma.product.update({
+          where: { id: product.id },
+          data: {
+            brand: prodData.brand,
+            isOutOfStock: prodData.isOutOfStock,
+          },
+        });
+      }
+
+      for (const vData of prodData.variants as Array<{ label: string; barcode?: string; retail: number; wholesale: number; recentChange?: boolean }>) {
         let variant = await prisma.productVariant.findFirst({
           where: { productId: product.id, label: vData.label },
         });
@@ -181,6 +188,7 @@ async function main() {
           variant = await prisma.productVariant.create({
             data: {
               label: vData.label,
+              barcode: vData.barcode || (prodData as any).barcode || null,
               productId: product.id,
             },
           });

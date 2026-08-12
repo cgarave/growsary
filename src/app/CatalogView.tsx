@@ -61,6 +61,7 @@ export default function CatalogView({
   // Scanner & Modals state
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [scannerTarget, setScannerTarget] = useState<"search" | "add" | "edit">("search");
+  const [activeScanVariantIndex, setActiveScanVariantIndex] = useState<number | null>(null);
   const [scannedBarcode, setScannedBarcode] = useState<string>("");
 
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -173,7 +174,7 @@ export default function CatalogView({
 
     if (scannerTarget === "search") {
       setSearchQuery(code);
-      const matched = products.find((p) => p.barcode === code);
+      const matched = products.find((p) => p.variants.some((v) => v.barcode === code));
       if (matched) {
         setSelectedCategory("All");
         if (!matched.isOutOfStock) {
@@ -328,8 +329,11 @@ export default function CatalogView({
       !q ||
       p.name.toLowerCase().includes(q) ||
       (p.brand && p.brand.toLowerCase().includes(q)) ||
-      (p.barcode && p.barcode.toLowerCase().includes(q)) ||
-      p.variants.some((v) => v.label.toLowerCase().includes(q));
+      p.variants.some(
+        (v) =>
+          v.label.toLowerCase().includes(q) ||
+          (v.barcode && v.barcode.toLowerCase().includes(q))
+      );
 
     return matchesCategory && matchesSearch;
   });
@@ -398,10 +402,13 @@ export default function CatalogView({
         isOpen={isAddProductOpen}
         onClose={() => setIsAddProductOpen(false)}
         categories={categories}
-        onOpenScanner={() => {
+        onOpenScanner={(variantIndex?: number) => {
           setScannerTarget("add");
+          setActiveScanVariantIndex(variantIndex ?? 0);
           setIsScannerOpen(true);
         }}
+        scannedBarcode={scannedBarcode}
+        activeScanVariantIndex={activeScanVariantIndex}
         onProductCreated={handleProductCreated}
         onProductUpdated={handleProductUpdated}
       />
@@ -412,10 +419,13 @@ export default function CatalogView({
         isOpen={!!editTarget}
         onClose={() => setEditTarget(null)}
         categories={categories}
-        onOpenScanner={() => {
+        onOpenScanner={(variantIndex?: number) => {
           setScannerTarget("edit");
+          setActiveScanVariantIndex(variantIndex ?? 0);
           setIsScannerOpen(true);
         }}
+        scannedBarcode={scannedBarcode}
+        activeScanVariantIndex={activeScanVariantIndex}
         onProductUpdated={handleProductUpdated}
       />
 
