@@ -431,6 +431,135 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
     }
   };
 
+  // ---------------------------------------------------------------------------
+  // Card Action Handlers
+  // ---------------------------------------------------------------------------
+  const handleConfirmAndAddSingle = (msgId: string, product: ParsedProductItem) => {
+    const execMessage = `EXECUTE_PRODUCT_CREATE:${JSON.stringify(product)}`;
+    setChatMessages((prev) =>
+      prev.map((m) => (m.id === msgId ? { ...m, confirmationCard: undefined } : m))
+    );
+    handleSendChatMessage(execMessage);
+  };
+
+  const handleCancelCard = (msgId: string) => {
+    setChatMessages((prev) =>
+      prev.map((m) =>
+        m.id === msgId
+          ? { ...m, confirmationCard: undefined, multipleConfirmationCard: undefined, priceUpdateCard: undefined }
+          : m
+      )
+    );
+    toast.info("Cancelled action.");
+  };
+
+  const handleToggleEditMode = (msgId: string) => {
+    setChatMessages((prev) =>
+      prev.map((m) => {
+        if (m.id === msgId && m.confirmationCard) {
+          return {
+            ...m,
+            confirmationCard: {
+              ...m.confirmationCard,
+              isEditing: !m.confirmationCard.isEditing,
+            },
+          };
+        }
+        return m;
+      })
+    );
+  };
+
+  const handleUpdateCardField = (
+    msgId: string,
+    field: keyof ParsedProductItem,
+    value: any
+  ) => {
+    setChatMessages((prev) =>
+      prev.map((m) => {
+        if (m.id === msgId && m.confirmationCard) {
+          return {
+            ...m,
+            confirmationCard: {
+              ...m.confirmationCard,
+              product: {
+                ...m.confirmationCard.product,
+                [field]: value,
+              },
+            },
+          };
+        }
+        return m;
+      })
+    );
+  };
+
+  const handleConfirmMultipleMode = (
+    msgId: string,
+    items: ParsedProductItem[],
+    mode: "single_with_variants" | "multiple_single_items"
+  ) => {
+    const execMessage = `EXECUTE_MULTIPLE_CREATE:${JSON.stringify({ items, mode })}`;
+    setChatMessages((prev) =>
+      prev.map((m) => (m.id === msgId ? { ...m, multipleConfirmationCard: undefined } : m))
+    );
+    handleSendChatMessage(execMessage);
+  };
+
+  const handleTogglePriceUpdateField = (
+    msgId: string,
+    variantId: string,
+    field: "updateRetail" | "updateWholesale" | "newRetailPrice" | "newWholesalePrice",
+    value: any
+  ) => {
+    setChatMessages((prev) =>
+      prev.map((m) => {
+        if (m.id === msgId && m.priceUpdateCard) {
+          return {
+            ...m,
+            priceUpdateCard: {
+              ...m.priceUpdateCard,
+              variantSelections: m.priceUpdateCard.variantSelections.map((v) =>
+                v.variantId === variantId ? { ...v, [field]: value } : v
+              ),
+            },
+          };
+        }
+        return m;
+      })
+    );
+  };
+
+  const handleExecutePriceUpdate = (msgId: string, card: NonNullable<ChatMessageItem["priceUpdateCard"]>) => {
+    const updatesToPerform = card.variantSelections.filter(
+      (v) => v.updateRetail || v.updateWholesale
+    );
+
+    if (updatesToPerform.length === 0) {
+      toast.error("Please check at least one price (retail or wholesale) to update.");
+      return;
+    }
+
+    const payloadObj = {
+      productId: card.productId,
+      variantUpdates: updatesToPerform.map((v) => ({
+        variantId: v.variantId,
+        updateRetail: v.updateRetail,
+        updateWholesale: v.updateWholesale,
+        newRetailPrice: v.newRetailPrice,
+        newWholesalePrice: v.newWholesalePrice,
+      })),
+    };
+
+    const execMessage = `EXECUTE_PRICE_UPDATE:${JSON.stringify(payloadObj)}`;
+
+    setChatMessages((prev) =>
+      prev.map((m) => (m.id === msgId ? { ...m, priceUpdateCard: undefined } : m))
+    );
+
+    handleSendChatMessage(execMessage);
+  };
+
   return (
     <>
       {/* Trigger Button Component */}
@@ -510,6 +639,294 @@ export default function AdminAiModalGroup({ existingCategories }: AdminAiModalGr
                           />
                         )}
                         <div className="whitespace-pre-line">{msg.text}</div>
+
+                        {/* 1. Single Product Confirmation Card */}
+                        {msg.confirmationCard && (
+                          <div className="mt-2.5 p-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xs space-y-2 text-xs">
+                            {!msg.confirmationCard.isEditing ? (
+                              <>
+                                <div className="space-y-1">
+                                  <div><strong className="text-zinc-900 dark:text-zinc-100">Product:</strong> {msg.confirmationCard.product.name}</div>
+                                  <div><strong className="text-zinc-900 dark:text-zinc-100">Brand:</strong> {msg.confirmationCard.product.brand || "—"}</div>
+                                  <div><strong className="text-zinc-900 dark:text-zinc-100">Variant:</strong> {msg.confirmationCard.product.variantLabel}</div>
+                                  <div><strong className="text-zinc-900 dark:text-zinc-100">Category:</strong> {msg.confirmationCard.product.categoryName || "General"}</div>
+                                  <div className="flex gap-3 text-teal-600 dark:text-teal-400 font-bold pt-1">
+                                    <span>Retail: ₱{msg.confirmationCard.product.retailPrice.toFixed(2)}</span>
+                                    <span>Wholesale: ₱{msg.confirmationCard.product.wholesalePrice.toFixed(2)}</span>
+                                  </div>
+                                </div>
+                                <div className="flex gap-1.5 pt-1">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleConfirmAndAddSingle(msg.id, msg.confirmationCard!.product)}
+                                    className="flex-1 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-lg cursor-pointer"
+                                  >
+                                    Confirm
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleToggleEditMode(msg.id)}
+                                    className="flex-1 border-zinc-300 dark:border-zinc-700 text-xs font-semibold rounded-lg cursor-pointer"
+                                  >
+                                    Edit
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleCancelCard(msg.id)}
+                                    className="flex-1 border-red-200 bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950 dark:border-red-900 text-xs font-semibold rounded-lg cursor-pointer"
+                                  >
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="font-bold text-teal-600 dark:text-teal-400 text-xs">
+                                  ✏️ Edit Product & Prices:
+                                </div>
+                                <div className="space-y-2">
+                                  <input
+                                    type="text"
+                                    placeholder="Product Name"
+                                    value={msg.confirmationCard.product.name}
+                                    onChange={(e) => handleUpdateCardField(msg.id, "name", e.target.value)}
+                                    className="w-full px-2.5 py-1 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg focus:outline-none focus:border-teal-500"
+                                  />
+                                  <div className="flex gap-2">
+                                    <input
+                                      type="text"
+                                      placeholder="Brand"
+                                      value={msg.confirmationCard.product.brand || ""}
+                                      onChange={(e) => handleUpdateCardField(msg.id, "brand", e.target.value)}
+                                      className="flex-1 px-2.5 py-1 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg focus:outline-none focus:border-teal-500"
+                                    />
+                                    <input
+                                      type="text"
+                                      placeholder="Variant Label"
+                                      value={msg.confirmationCard.product.variantLabel}
+                                      onChange={(e) => handleUpdateCardField(msg.id, "variantLabel", e.target.value)}
+                                      className="flex-1 px-2.5 py-1 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg focus:outline-none focus:border-teal-500"
+                                    />
+                                  </div>
+                                  <select
+                                    value={msg.confirmationCard.product.categoryName || existingCategories[0] || "General"}
+                                    onChange={(e) => handleUpdateCardField(msg.id, "categoryName", e.target.value)}
+                                    className="w-full px-2.5 py-1 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg focus:outline-none focus:border-teal-500"
+                                  >
+                                    {existingCategories.map((c) => (
+                                      <option key={c} value={c}>{c}</option>
+                                    ))}
+                                  </select>
+                                  <div className="flex gap-2">
+                                    <div className="flex-1">
+                                      <label className="text-[10px] text-zinc-500">Retail (₱)</label>
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        value={msg.confirmationCard.product.retailPrice}
+                                        onChange={(e) => handleUpdateCardField(msg.id, "retailPrice", parseFloat(e.target.value) || 0)}
+                                        className="w-full px-2 py-1 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg focus:outline-none focus:border-teal-500 font-bold"
+                                      />
+                                    </div>
+                                    <div className="flex-1">
+                                      <label className="text-[10px] text-zinc-500">Wholesale (₱)</label>
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        value={msg.confirmationCard.product.wholesalePrice}
+                                        onChange={(e) => handleUpdateCardField(msg.id, "wholesalePrice", parseFloat(e.target.value) || 0)}
+                                        className="w-full px-2 py-1 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg focus:outline-none focus:border-teal-500 font-bold"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex gap-1.5 pt-1">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleConfirmAndAddSingle(msg.id, msg.confirmationCard!.product)}
+                                    className="flex-1 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-lg cursor-pointer"
+                                  >
+                                    Confirm & Add
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleCancelCard(msg.id)}
+                                    className="flex-1 border-zinc-300 text-xs font-semibold rounded-lg cursor-pointer"
+                                  >
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        )}
+
+                        {/* 2. Multiple Products Confirmation Card */}
+                        {msg.multipleConfirmationCard && (
+                          <div className="mt-2.5 p-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xs space-y-2.5 text-xs">
+                            <div className="font-bold text-teal-600 dark:text-teal-400">
+                              Extracted {msg.multipleConfirmationCard.items.length} Entries:
+                            </div>
+                            <div className="max-h-28 overflow-y-auto space-y-1 pr-1 border-b border-zinc-100 dark:border-zinc-800 pb-2">
+                              {msg.multipleConfirmationCard.items.map((item, idx) => (
+                                <div key={idx} className="flex justify-between items-center text-zinc-700 dark:text-zinc-300">
+                                  <span>• {item.name} ({item.variantLabel})</span>
+                                  <span className="font-bold text-teal-600 dark:text-teal-400">₱{item.retailPrice.toFixed(2)}</span>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                              <Button
+                                size="sm"
+                                onClick={() => handleConfirmMultipleMode(msg.id, msg.multipleConfirmationCard!.items, "single_with_variants")}
+                                className="w-full bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 dark:bg-teal-950 dark:border-teal-900 dark:text-teal-300 font-bold text-xs rounded-lg cursor-pointer"
+                              >
+                                Single item with multiple variants
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleConfirmMultipleMode(msg.id, msg.multipleConfirmationCard!.items, "multiple_single_items")}
+                                className="w-full border-zinc-300 font-semibold text-xs rounded-lg cursor-pointer"
+                              >
+                                Multiple separate single items
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleCancelCard(msg.id)}
+                                className="w-full border-red-200 bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950 dark:border-red-900 text-xs font-semibold rounded-lg cursor-pointer"
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 3. Price Update Confirmation Card */}
+                        {msg.priceUpdateCard && (
+                          <div className="mt-2.5 p-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xs space-y-3 text-xs">
+                            <div className="border-b border-zinc-100 dark:border-zinc-800 pb-2">
+                              <div className="font-bold text-teal-600 dark:text-teal-400">
+                                🏷️ Price Update Confirmation
+                              </div>
+                              <div className="font-medium text-zinc-800 dark:text-zinc-200">
+                                {msg.priceUpdateCard.productName}
+                                {msg.priceUpdateCard.brand && <span className="text-zinc-400 font-normal"> ({msg.priceUpdateCard.brand})</span>}
+                              </div>
+                              <div className="text-[10px] text-zinc-400">
+                                Category: {msg.priceUpdateCard.categoryName}
+                              </div>
+                            </div>
+
+                            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                              {msg.priceUpdateCard.variantSelections.map((v) => (
+                                <div
+                                  key={v.variantId}
+                                  className="p-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg space-y-1.5"
+                                >
+                                  <div className="font-semibold text-zinc-800 dark:text-zinc-200 flex justify-between items-center">
+                                    <span>{v.label}</span>
+                                    <span className="text-[10px] text-zinc-400">
+                                      Current: ₱{v.currentRetail} R / ₱{v.currentWholesale} W
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center gap-2 pt-0.5">
+                                    <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-medium text-zinc-700 dark:text-zinc-300 select-none">
+                                      <input
+                                        type="checkbox"
+                                        checked={v.updateRetail}
+                                        onChange={(e) =>
+                                          handleTogglePriceUpdateField(
+                                            msg.id,
+                                            v.variantId,
+                                            "updateRetail",
+                                            e.target.checked
+                                          )
+                                        }
+                                        className="rounded border-zinc-300 text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
+                                      />
+                                      <span>Retail Price (₱)</span>
+                                    </label>
+                                    {v.updateRetail && (
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        value={v.newRetailPrice}
+                                        onChange={(e) =>
+                                          handleTogglePriceUpdateField(
+                                            msg.id,
+                                            v.variantId,
+                                            "newRetailPrice",
+                                            parseFloat(e.target.value) || 0
+                                          )
+                                        }
+                                        className="ml-auto w-20 px-2 py-0.5 text-xs bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded focus:outline-none focus:border-teal-500 font-bold"
+                                      />
+                                    )}
+                                  </div>
+
+                                  <div className="flex items-center gap-2">
+                                    <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-medium text-zinc-700 dark:text-zinc-300 select-none">
+                                      <input
+                                        type="checkbox"
+                                        checked={v.updateWholesale}
+                                        onChange={(e) =>
+                                          handleTogglePriceUpdateField(
+                                            msg.id,
+                                            v.variantId,
+                                            "updateWholesale",
+                                            e.target.checked
+                                          )
+                                        }
+                                        className="rounded border-zinc-300 text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
+                                      />
+                                      <span>Wholesale Price (₱)</span>
+                                    </label>
+                                    {v.updateWholesale && (
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        value={v.newWholesalePrice}
+                                        onChange={(e) =>
+                                          handleTogglePriceUpdateField(
+                                            msg.id,
+                                            v.variantId,
+                                            "newWholesalePrice",
+                                            parseFloat(e.target.value) || 0
+                                          )
+                                        }
+                                        className="ml-auto w-20 px-2 py-0.5 text-xs bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded focus:outline-none focus:border-teal-500 font-bold"
+                                      />
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+
+                            <div className="flex gap-2 pt-1 border-t border-zinc-100 dark:border-zinc-800">
+                              <Button
+                                size="sm"
+                                onClick={() => handleExecutePriceUpdate(msg.id, msg.priceUpdateCard!)}
+                                className="flex-1 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-lg cursor-pointer"
+                              >
+                                Confirm Price Update
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleCancelCard(msg.id)}
+                                className="border-zinc-300 text-xs font-semibold rounded-lg cursor-pointer"
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                       </MessageContent>
                     </Message>
                   ))}
