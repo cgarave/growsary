@@ -66,9 +66,11 @@ export default function CatalogHeader({
 						<button onClick={() => onTogglePriceMode("wholesale")}>Wholesale</button>
 					</div>
 					<div className="space-x-2">
-						<Button variant="outline" className="border-zinc-300 rounded-[9px]" onClick={onOpenScanner}>
-							<Camera data-icon="inline-start" />
-						</Button>
+						{isAdmin && (
+							<Button variant="outline" className="border-zinc-300 rounded-[9px]" onClick={onOpenScanner} title="Scan barcode">
+								<Camera data-icon="inline-start" />
+							</Button>
+						)}
 						<Button variant="outline" className="border-zinc-300 rounded-[9px] relative" onClick={onOpenCart}>
 							<ShoppingBag data-icon="inline-start" />
 							{totalCartCount > 0 && (

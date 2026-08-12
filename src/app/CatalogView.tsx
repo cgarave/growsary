@@ -181,7 +181,9 @@ export default function CatalogView({
           setSelectedProductForVariant(matched);
         }
       } else {
-        toast.info("No item found matching scanned barcode.");
+        toast.info("No item found matching scanned barcode. Opening Add Item modal...");
+        setActiveScanVariantIndex(0);
+        setIsAddProductOpen(true);
       }
     }
   };
