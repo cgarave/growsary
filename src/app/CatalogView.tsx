@@ -27,6 +27,13 @@ import DeleteConfirmModal from "@/components/catalog/DeleteConfirmModal";
 import VariantModal from "@/components/catalog/VariantModal";
 import CartModal from "@/components/catalog/CartModal";
 import { supabase } from "@/lib/supabase-client";
+import {
+  loadCachedCatalog,
+  saveCachedCatalog,
+  CATALOG_STORAGE_KEY,
+  CATALOG_SYNC_EVENT,
+  CachedCatalogData,
+} from "@/lib/catalog-storage";
 
 interface CatalogViewProps {
   initialCategories: CatalogCategory[];
@@ -40,6 +47,7 @@ export default function CatalogView({
   const { data: session } = authClient.useSession();
   const [isAdminState, setIsAdminState] = useState(false);
   const [isLoggedOut, setIsLoggedOut] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -80,13 +88,96 @@ export default function CatalogView({
 
   /**
    * ==============================================================================
-   * SUPABASE REALTIME WEBSOCKETS + WINDOW FOCUS SYNC HOOK
+   * 1. LOCAL STORAGE CACHE INITIALIZATION (CLIENT HYDRATION)
+   * ==============================================================================
+   * Hydrates state instantly from browser localStorage if available.
+   * If cache is empty, seeds localStorage with the server-rendered initial catalog.
+   */
+  useEffect(() => {
+    const cached = loadCachedCatalog();
+    if (cached) {
+      setProducts(cached.products);
+      setCategories(cached.categories);
+    } else {
+      saveCachedCatalog(initialProducts, initialCategories);
+    }
+  }, [initialProducts, initialCategories]);
+
+  /**
+   * ==============================================================================
+   * 2. CROSS-TAB & SAME-TAB LOCAL STORAGE SYNC
+   * ==============================================================================
+   * Listens for changes committed across other open browser tabs or windows.
+   */
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === CATALOG_STORAGE_KEY && e.newValue) {
+        try {
+          const cached: CachedCatalogData = JSON.parse(e.newValue);
+          if (cached && Array.isArray(cached.products) && Array.isArray(cached.categories)) {
+            setProducts(cached.products);
+            setCategories(cached.categories);
+          }
+        } catch (err) {
+          console.error("Error processing cross-tab catalog sync:", err);
+        }
+      }
+    };
+
+    const handleSameTabSync = (e: Event) => {
+      const customEvent = e as CustomEvent<CachedCatalogData | null>;
+      if (customEvent.detail) {
+        setProducts(customEvent.detail.products);
+        setCategories(customEvent.detail.categories);
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    window.addEventListener(CATALOG_SYNC_EVENT, handleSameTabSync);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener(CATALOG_SYNC_EVENT, handleSameTabSync);
+    };
+  }, []);
+
+  /**
+   * ==============================================================================
+   * 3. NETWORK STATUS MONITORING (OFFLINE-FIRST RESILIENCE)
+   * ==============================================================================
+   */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    setIsOnline(navigator.onLine);
+
+    const handleOnline = () => {
+      setIsOnline(true);
+      toast.success("Back online — syncing catalog");
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      toast.warning("You are offline. Showing cached catalog.");
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  /**
+   * ==============================================================================
+   * 4. SUPABASE REALTIME WEBSOCKETS + WINDOW FOCUS SYNC HOOK
    * ==============================================================================
    */
   useEffect(() => {
     let isSubscribed = true;
 
-    // Helper to fetch latest fresh catalog from Supabase via Server Action
+    // Helper to fetch latest fresh catalog from Supabase via Server Action and sync cache
     const fetchLatestData = async () => {
       // Pause automatic state updates while an admin is actively editing a form in a modal
       if (isAddProductOpen || editTarget) return;
@@ -96,6 +187,7 @@ export default function CatalogView({
         if (isSubscribed) {
           setProducts(fresh.products);
           setCategories(fresh.categories);
+          saveCachedCatalog(fresh.products, fresh.categories);
         }
       } catch (err) {
         console.error("Failed to sync catalog data:", err);
@@ -128,14 +220,14 @@ export default function CatalogView({
     };
 
     window.addEventListener("focus", handleFocus);
-    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("visibilitychange", handleVisibility);
 
     // CLEANUP ON UNMOUNT
     return () => {
       isSubscribed = false;
       supabase.removeChannel(channel);
       window.removeEventListener("focus", handleFocus);
-      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [isAddProductOpen, editTarget]);
 
@@ -209,33 +301,45 @@ export default function CatalogView({
     setIsLoggedOut(false);
   };
 
-  // Product CRUD state updates (NON-BLOCKING OPTIMISTIC UI)
+  /**
+   * ==============================================================================
+   * PRODUCT CRUD & CACHE INVALIDATION HANDLERS
+   * ==============================================================================
+   */
   const handleProductCreated = (newProduct: CatalogProduct, newCategoryName?: string) => {
-    setProducts((prev) => [newProduct, ...prev]);
+    let nextCategories = categories;
     if (newCategoryName && !categories.some((c) => c.name === newCategoryName)) {
-      setCategories((prev) => [
-        ...prev,
+      nextCategories = [
+        ...categories,
         {
           id: `cat-${Date.now()}`,
           name: newCategoryName,
           productCount: 1,
         },
-      ]);
+      ];
+      setCategories(nextCategories);
     }
+    const nextProducts = [newProduct, ...products];
+    setProducts(nextProducts);
+    saveCachedCatalog(nextProducts, nextCategories);
   };
 
   const handleProductUpdated = (updatedProduct: CatalogProduct) => {
-    setProducts((prev) =>
-      prev.map((p) => (p.id === updatedProduct.id ? updatedProduct : p))
+    const nextProducts = products.map((p) =>
+      p.id === updatedProduct.id ? updatedProduct : p
     );
+    setProducts(nextProducts);
+    saveCachedCatalog(nextProducts, categories);
   };
 
   const handleDeleteProduct = async () => {
     if (!deleteTarget) return;
     const target = deleteTarget;
 
-    // 1. INSTANT OPTIMISTIC DELETE (Closes modal immediately)
-    setProducts((prev) => prev.filter((p) => p.id !== target.id));
+    // 1. INSTANT OPTIMISTIC DELETE & CACHE UPDATE
+    const nextProducts = products.filter((p) => p.id !== target.id);
+    setProducts(nextProducts);
+    saveCachedCatalog(nextProducts, categories);
     setDeleteTarget(null);
     toast.success(`Deleted "${target.name}"`);
 
@@ -245,7 +349,9 @@ export default function CatalogView({
     } catch (err: any) {
       toast.error(err.message || "Failed to delete product in database");
       // Rollback on failure
-      setProducts((prev) => [target, ...prev]);
+      const rolledBack = [target, ...nextProducts];
+      setProducts(rolledBack);
+      saveCachedCatalog(rolledBack, categories);
     }
   };
 
@@ -253,8 +359,10 @@ export default function CatalogView({
     if (!deleteCategoryTarget) return;
     const target = deleteCategoryTarget;
 
-    // 1. INSTANT OPTIMISTIC DELETE (Closes modal immediately)
-    setCategories((prev) => prev.filter((c) => c.id !== target.id));
+    // 1. INSTANT OPTIMISTIC DELETE & CACHE UPDATE
+    const nextCategories = categories.filter((c) => c.id !== target.id);
+    setCategories(nextCategories);
+    saveCachedCatalog(products, nextCategories);
     if (selectedCategory === target.name) {
       setSelectedCategory("All");
     }
@@ -267,19 +375,21 @@ export default function CatalogView({
     } catch (err: any) {
       toast.error(err.message || "Failed to delete category in database");
       // Rollback on failure
-      setCategories((prev) => [...prev, target]);
+      const rolledBack = [...nextCategories, target];
+      setCategories(rolledBack);
+      saveCachedCatalog(products, rolledBack);
     }
   };
 
   const handleToggleStock = async (product: CatalogProduct) => {
     const nextStatus = !product.isOutOfStock;
 
-    // 1. INSTANT OPTIMISTIC TOGGLE
-    setProducts((prev) =>
-      prev.map((p) =>
-        p.id === product.id ? { ...p, isOutOfStock: nextStatus } : p
-      )
+    // 1. INSTANT OPTIMISTIC TOGGLE & CACHE UPDATE
+    const nextProducts = products.map((p) =>
+      p.id === product.id ? { ...p, isOutOfStock: nextStatus } : p
     );
+    setProducts(nextProducts);
+    saveCachedCatalog(nextProducts, categories);
     toast.info(`"${product.name}" marked as ${nextStatus ? "Out of Stock" : "In Stock"}`);
 
     // 2. BACKGROUND SERVER CALL
@@ -288,11 +398,11 @@ export default function CatalogView({
     } catch (err: any) {
       toast.error(err.message || "Failed to update stock state in database");
       // Rollback on failure
-      setProducts((prev) =>
-        prev.map((p) =>
-          p.id === product.id ? { ...p, isOutOfStock: !nextStatus } : p
-        )
+      const rolledBack = products.map((p) =>
+        p.id === product.id ? { ...p, isOutOfStock: !nextStatus } : p
       );
+      setProducts(rolledBack);
+      saveCachedCatalog(rolledBack, categories);
     }
   };
 
@@ -368,6 +478,14 @@ export default function CatalogView({
         onLogout={handleAdminLogout}
         categories={categories.map((c) => c.name)}
       />
+
+      {/* Offline Status Banner */}
+      {!isOnline && (
+        <div className="my-2 flex items-center justify-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-300">
+          <span className="inline-block h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+          <span>Offline mode — viewing cached catalog from local storage</span>
+        </div>
+      )}
 
       {/* Category Chips Bar */}
       <CategoryFilterBar
